@@ -271,17 +271,6 @@
     ambient.querySelectorAll('.mote').forEach(mote => { mote.style.animationPlayState = document.hidden ? 'paused' : 'running'; });
   });
   const pointerDevice = window.matchMedia('(hover: hover) and (pointer: fine)');
-  let frame;
-  document.addEventListener('pointermove', event => {
-    if (!pointerDevice.matches || reduceMotion.matches || document.body.classList.contains('select-open')) return;
-    cancelAnimationFrame(frame);
-    frame = requestAnimationFrame(() => {
-      const x = (event.clientX / innerWidth - .5) * -14;
-      const y = (event.clientY / innerHeight - .5) * -10;
-      document.documentElement.style.setProperty('--scene-x', `${x}px`);
-      document.documentElement.style.setProperty('--scene-y', `${y}px`);
-    });
-  }, { passive: true });
   document.querySelectorAll('.intro-card, .directory-card, .contact-card, .route-picker .submenu a').forEach(card => card.addEventListener('pointermove', event => {
     if (!pointerDevice.matches || reduceMotion.matches) return;
     const rect = card.getBoundingClientRect();
