@@ -8,6 +8,9 @@
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let rendered = false;
   let renderedRoute = '';
+  const routeHistory = [];
+  const backButton = document.querySelector('#page-back');
+  const footerContact = document.querySelector('#footer-contact');
   let toastTimer;
   function notify(message) {
     const toast = document.querySelector('.toast');
@@ -38,6 +41,14 @@
     const page = Object.hasOwn(labels, requested) ? requested : 'home';
     const navigationChanged = renderedRoute !== `${page}/${section || ''}`;
     renderedRoute = `${page}/${section || ''}`;
+    const currentHash = `#${page}${section ? '/' + section : ''}`;
+    if (routeHistory.at(-1) !== currentHash) {
+      // Collapse a return to the preceding route so repeated Back clicks reach home.
+      if (routeHistory.at(-2) === currentHash) routeHistory.pop();
+      else routeHistory.push(currentHash);
+    }
+    backButton.hidden = page === 'home';
+    footerContact.hidden = page === 'contact';
     const changed = !document.getElementById(`page-${page}`).classList.contains('active');
     if (changed && rendered && !reduceMotion.matches) {
       const wipe = document.querySelector('.page-wipe');
@@ -84,6 +95,13 @@
     if (!event.target.closest('.sidebar, .route-picker, .mobile-menu')) closeNavigation();
   });
   window.addEventListener('hashchange', showPage);
+  backButton.addEventListener('click', () => {
+    const previous = routeHistory.at(-2);
+    const [page, section] = renderedRoute.split('/');
+    // A direct link has no site history: return to its directory, or to home.
+    if (!previous) routeHistory.length = 0;
+    location.hash = previous || (section ? `#${page}` : '#home');
+  });
   showPage();
   document.querySelectorAll('.avatar').forEach(img => {
     img.addEventListener('error', () => { img.src = 'avatar.svg'; }, { once: true });
