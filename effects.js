@@ -1,5 +1,30 @@
 (() => {
   'use strict';const reduce=matchMedia('(prefers-reduced-motion: reduce)'),fine=matchMedia('(hover:hover) and (pointer:fine)');
+  const pressed = new Map();
+  const pressTarget = event => event.target.closest('button, a[href], .answer-option, [role="option"]');
+  function press(element) {
+    if (!element || element.matches(':disabled, [aria-disabled="true"]') || reduce.matches) return;
+    const previous = pressed.get(element);
+    if (previous) clearTimeout(previous.timer);
+    pressed.set(element, { time: performance.now(), timer: null });
+    element.classList.add('is-pressed');
+  }
+  function release(immediate = false) {
+    pressed.forEach((state, element) => {
+      clearTimeout(state.timer);
+      const delay = immediate ? 0 : Math.max(0, 120 - (performance.now() - state.time));
+      if (!delay) { element.classList.remove('is-pressed'); pressed.delete(element); }
+      else state.timer = setTimeout(() => { element.classList.remove('is-pressed'); pressed.delete(element); }, delay);
+    });
+  }
+  document.addEventListener('pointerdown', event => { if (event.button === 0) press(pressTarget(event)); }, { passive: true });
+  document.addEventListener('pointerup', () => release(), { passive: true });
+  document.addEventListener('pointercancel', () => release(true), { passive: true });
+  document.addEventListener('keydown', event => { if (!event.repeat && ['Enter', ' '].includes(event.key)) press(pressTarget(event)); });
+  document.addEventListener('keyup', event => { if (['Enter', ' '].includes(event.key)) release(); });
+  window.addEventListener('blur', () => release(true));
+  document.addEventListener('visibilitychange', () => { if (document.hidden) release(true); });
+  reduce.addEventListener('change', () => release(true));
   const canvas=document.createElement('canvas');canvas.className='pointer-effects';canvas.setAttribute('aria-hidden','true');document.body.append(canvas);const ctx=canvas.getContext('2d');let points=[],bursts=[],frame=0,last=0,dpr=1;
   function resize(){dpr=Math.min(devicePixelRatio||1,2);canvas.width=innerWidth*dpr;canvas.height=innerHeight*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);}
   function clear(){cancelAnimationFrame(frame);frame=0;points=[];bursts=[];ctx.clearRect(0,0,innerWidth,innerHeight);}

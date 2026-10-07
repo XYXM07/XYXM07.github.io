@@ -11,6 +11,10 @@
   const routeHistory = [];
   const backButton = document.querySelector('#page-back');
   const footerContact = document.querySelector('#footer-contact');
+  const pageContainer = document.querySelector('#page-container');
+  let routeTransition;
+  let routeEntrance;
+  let routeRevision = 0;
   let toastTimer;
   function notify(message) {
     const toast = document.querySelector('.toast');
@@ -35,10 +39,48 @@
     if (button.parentElement.classList.contains('navigation')) menu.style.setProperty('--menu-left', `${button.offsetLeft}px`);
     menu.hidden = !expanded;
   }
-  function showPage() {
+  function readRoute() {
     const [route, section] = location.hash.slice(1).split('/');
     const requested = ({ github: 'contact', about: 'home', interests: 'home', explore: 'home' })[route] || route || 'home';
     const page = Object.hasOwn(labels, requested) ? requested : 'home';
+    return { page, section };
+  }
+  function showPage() {
+    const next = readRoute();
+    const revision = ++routeRevision;
+    routeTransition?.skipTransition();
+    routeEntrance?.cancel();
+    closeNavigation();
+    if (renderedRoute === `${next.page}/${next.section || ''}`) return;
+    if (!rendered || reduceMotion.matches) {
+      renderPage(next);
+      return;
+    }
+    if (typeof document.startViewTransition === 'function') {
+      // Capture the outgoing view before switching game/tool panels as well as pages.
+      const transition = document.startViewTransition(() => {
+        if (revision === routeRevision) renderPage(next);
+      });
+      routeTransition = transition;
+      transition.ready.catch(() => {});
+      transition.finished.then(() => {
+        if (routeTransition === transition) routeTransition = null;
+      }, () => {});
+    } else {
+      renderPage(next);
+      routeEntrance = pageContainer.animate([
+        { opacity: 0, transform: 'translateY(24px) scale(.99)' },
+        { opacity: 1, transform: 'translateY(0) scale(1)' }
+      ], { duration: 480, easing: 'cubic-bezier(.22,1,.36,1)' });
+    }
+  }
+  reduceMotion.addEventListener('change', () => {
+    if (reduceMotion.matches) {
+      routeTransition?.skipTransition();
+      routeEntrance?.cancel();
+    }
+  });
+  function renderPage({ page, section }) {
     const navigationChanged = renderedRoute !== `${page}/${section || ''}`;
     renderedRoute = `${page}/${section || ''}`;
     const currentHash = `#${page}${section ? '/' + section : ''}`;
@@ -49,13 +91,6 @@
     }
     backButton.hidden = page === 'home';
     footerContact.hidden = page === 'contact';
-    const changed = !document.getElementById(`page-${page}`).classList.contains('active');
-    if (changed && rendered && !reduceMotion.matches) {
-      const wipe = document.querySelector('.page-wipe');
-      wipe.classList.remove('switching');
-      void wipe.offsetWidth;
-      wipe.classList.add('switching');
-    }
     pages.forEach(section => {
       const active = section.id === `page-${page}`;
       section.hidden = !active;
@@ -199,7 +234,7 @@
       document.documentElement.style.setProperty('--scene-y', `${y}px`);
     });
   }, { passive: true });
-  document.querySelectorAll('.intro-card, .directory-card, .route-picker .submenu a').forEach(card => card.addEventListener('pointermove', event => {
+  document.querySelectorAll('.intro-card, .directory-card, .contact-card, .route-picker .submenu a').forEach(card => card.addEventListener('pointermove', event => {
     if (!pointerDevice.matches || reduceMotion.matches) return;
     const rect = card.getBoundingClientRect();
     card.style.setProperty('--card-x', `${event.clientX - rect.left}px`);
