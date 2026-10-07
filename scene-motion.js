@@ -23,10 +23,10 @@
     noticeTimer = setTimeout(() => toast.classList.remove('visible'), 3200);
   }
   function move(x, y) {
-    const scale = mobile.matches ? 1.06 : 1.045;
+    const scale = mobile.matches ? 1.09 : 1.045;
     // The overscan must always exceed the offset, including narrow landscape screens.
-    const limitX = Math.max(0, Math.min(mobile.matches ? 8 : 10, innerWidth * (scale - 1) / 2 - 2));
-    const limitY = Math.max(0, Math.min(mobile.matches ? 6 : 7, innerHeight * (scale - 1) / 2 - 2));
+    const limitX = Math.max(0, Math.min(mobile.matches ? 12 : 15, innerWidth * (scale - 1) / 2 - 2));
+    const limitY = Math.max(0, Math.min(mobile.matches ? 9 : 11, innerHeight * (scale - 1) / 2 - 2));
     target = { x: clamp(x, limitX), y: clamp(y, limitY) };
     if (!frame) frame = requestAnimationFrame(() => {
       frame = 0;
@@ -36,11 +36,10 @@
   }
   function center() { baseline = null; move(0, 0); }
   function updateButton() {
-    button.hidden = !mobile.matches || reduce.matches || !orientation;
+    button.hidden = enabled || !mobile.matches || reduce.matches || !orientation;
     button.disabled = !window.isSecureContext;
     button.setAttribute('aria-pressed', String(enabled));
-    button.textContent = !window.isSecureContext ? '重力感应需 HTTPS'
-      : enabled ? received ? '关闭重力感应' : '等待重力感应' : '开启重力感应';
+    button.textContent = !window.isSecureContext ? '重力感应需 HTTPS' : '开启重力感应';
   }
   function tilt(event) {
     if (!enabled || document.hidden || reduce.matches || !mobile.matches || document.body.classList.contains('select-open')) return;
@@ -56,7 +55,7 @@
     const beta = angleDelta(event.beta, baseline.beta), gamma = angleDelta(event.gamma, baseline.gamma);
     const x = gamma * Math.cos(angle) + beta * Math.sin(angle);
     const y = beta * Math.cos(angle) - gamma * Math.sin(angle);
-    move(-x / 25 * 8, -y / 25 * 6);
+    move(-x / 25 * 12, -y / 25 * 9);
   }
   function listen(manual = false) {
     window.removeEventListener('deviceorientation', tilt);
@@ -88,7 +87,7 @@
     updateButton();
   }
   button.addEventListener('click', async () => {
-    if (enabled) { stop(); return; }
+    if (enabled) return;
     if (!mobile.matches || reduce.matches || !orientation || !window.isSecureContext) return;
     button.disabled = true;
     try {
@@ -110,7 +109,7 @@
   });
   document.addEventListener('pointermove', event => {
     if (!fine.matches || event.pointerType === 'touch' || reduce.matches || document.hidden || document.body.classList.contains('select-open')) return;
-    move((event.clientX / innerWidth - .5) * -20, (event.clientY / innerHeight - .5) * -14);
+    move((event.clientX / innerWidth - .5) * -30, (event.clientY / innerHeight - .5) * -22);
   }, { passive: true });
   document.addEventListener('pointerleave', () => { if (!enabled) center(); });
   document.addEventListener('visibilitychange', () => {
@@ -124,7 +123,7 @@
   window.screen?.orientation?.addEventListener('change', center);
   window.addEventListener('orientationchange', center, { passive: true });
   function refresh() {
-    root.style.setProperty('--scene-scale', mobile.matches ? '1.06' : '1.045');
+    root.style.setProperty('--scene-scale', mobile.matches ? '1.09' : '1.045');
     if (enabled && (!mobile.matches || reduce.matches)) stop();
     center();
     updateButton();
