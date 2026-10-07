@@ -1,0 +1,190 @@
+(() => {
+  'use strict';
+  const config = window.SITE_CONFIG || {};
+  const labels = { home: '首页', contact: '与我联系', games: '小游戏', tools: '工具栏', psychology: '心理测试' };
+  const pages = [...document.querySelectorAll('.page')];
+  const dialog = document.querySelector('#github-dialog');
+  const mobileButton = document.querySelector('.mobile-menu');
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  let rendered = false;
+  let renderedRoute = '';
+  let toastTimer;
+  function notify(message) {
+    const toast = document.querySelector('.toast');
+    toast.textContent = message;
+    toast.classList.add('visible');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('visible'), 3200);
+  }
+  function closeNavigation() {
+    if (document.body.classList.contains('nav-open') && document.querySelector('.sidebar').contains(document.activeElement)) {
+      mobileButton.focus({ preventScroll: true });
+    }
+    document.body.classList.remove('nav-open');
+    mobileButton.setAttribute('aria-expanded', 'false');
+    mobileButton.setAttribute('aria-label', '打开导航菜单');
+    document.querySelectorAll('.disclosure').forEach(button => setDisclosure(button, false));
+  }
+  function setDisclosure(button, expanded) {
+    if (button.getAttribute('aria-expanded') === String(expanded)) return;
+    button.setAttribute('aria-expanded', String(expanded));
+    const menu = document.getElementById(button.getAttribute('aria-controls'));
+    if (button.parentElement.classList.contains('navigation')) menu.style.setProperty('--menu-left', `${button.offsetLeft}px`);
+    menu.hidden = !expanded;
+  }
+  function showPage() {
+    const [route, section] = location.hash.slice(1).split('/');
+    const requested = ({ github: 'contact', about: 'home', interests: 'home', explore: 'home' })[route] || route || 'home';
+    const page = Object.hasOwn(labels, requested) ? requested : 'home';
+    const navigationChanged = renderedRoute !== `${page}/${section || ''}`;
+    renderedRoute = `${page}/${section || ''}`;
+    const changed = !document.getElementById(`page-${page}`).classList.contains('active');
+    if (changed && rendered && !reduceMotion.matches) {
+      const wipe = document.querySelector('.page-wipe');
+      wipe.classList.remove('switching');
+      void wipe.offsetWidth;
+      wipe.classList.add('switching');
+    }
+    pages.forEach(section => {
+      const active = section.id === `page-${page}`;
+      section.hidden = !active;
+      section.classList.toggle('active', active);
+    });
+    document.querySelectorAll('[data-page], .submenu a, .directory-back').forEach(link => {
+      const active = link.getAttribute('href') === `#${page}${section ? '/' + section : ''}`;
+      link.classList.toggle('active', active);
+      if (active) {
+        link.setAttribute('aria-current', 'page');
+      } else link.removeAttribute('aria-current');
+    });
+    document.querySelector('#page-label').textContent = labels[page];
+    document.querySelectorAll('.navigation > .disclosure').forEach(button => button.classList.toggle('active', button.getAttribute('aria-controls') === `${page}-menu`));
+    document.title = page === 'home' ? '星月晓梦的个人站' : `${labels[page]} · 星月晓梦`; 
+    closeNavigation();
+    rendered = true;
+    document.dispatchEvent(new CustomEvent('site:pagechange', { detail: { page, section } }));
+    if (navigationChanged) {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      const title = document.querySelector(`#page-${page} h1`);
+      title.tabIndex = -1;
+      title.focus({ preventScroll: true });
+    }
+  }
+  document.querySelectorAll('.submenu').forEach(menu => {
+    [...menu.children].forEach((item, index) => item.style.setProperty('--menu-index', index));
+  });
+  document.querySelectorAll('.disclosure').forEach(button => button.addEventListener('click', () => {
+    const expanded = button.getAttribute('aria-expanded') !== 'true';
+    document.querySelectorAll('.disclosure').forEach(other => { if (other !== button) setDisclosure(other, false); });
+    setDisclosure(button, expanded);
+  }));
+  document.addEventListener('click', event => {
+    const link = event.target.closest('.submenu a, .hub-navigation a');
+    if (link && link.getAttribute('href') === location.hash) closeNavigation();
+    if (!event.target.closest('.sidebar, .route-picker, .mobile-menu')) closeNavigation();
+  });
+  window.addEventListener('hashchange', showPage);
+  showPage();
+  document.querySelectorAll('.avatar').forEach(img => {
+    img.addEventListener('error', () => { img.src = 'avatar.svg'; }, { once: true });
+    if (config.avatar) img.src = config.avatar;
+  });
+  const now = new Date();
+  document.querySelector('#today').textContent = new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' }).format(now);
+  document.querySelector('#year').textContent = now.getFullYear();
+  const themeButton = document.querySelector('.theme-toggle');
+  function setTheme(light) {
+    document.body.classList.toggle('light', light);
+    themeButton.querySelector('use').setAttribute('href', light ? '#i-moon' : '#i-sun');
+    themeButton.querySelector('span').textContent = light ? '切换深色' : '切换浅色';
+    themeButton.setAttribute('aria-label', light ? '切换为深色主题' : '切换为浅色主题');
+    document.querySelector('meta[name="theme-color"]').content = light ? '#487b8a' : '#183544';
+  }
+  try { setTheme(localStorage.getItem('star-moon-theme') === 'light'); } catch { setTheme(false); }
+  themeButton.addEventListener('click', () => {
+    const light = !document.body.classList.contains('light');
+    setTheme(light);
+    try { localStorage.setItem('star-moon-theme', light ? 'light' : 'dark'); } catch { /* Theme works even if storage is disabled. */ }
+  });
+  mobileButton.addEventListener('click', () => {
+    const open = document.body.classList.toggle('nav-open');
+    mobileButton.setAttribute('aria-expanded', String(open));
+    mobileButton.setAttribute('aria-label', open ? '关闭导航菜单' : '打开导航菜单');
+    if (open) document.querySelector('.sidebar a').focus();
+  });
+  document.querySelector('.nav-scrim').addEventListener('click', closeNavigation);
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape') return;
+    const expanded = document.querySelector('.disclosure[aria-expanded="true"]');
+    closeNavigation();
+    if (expanded) expanded.focus({ preventScroll: true });
+  });
+  document.querySelectorAll('.github-link').forEach(button => {
+    let url;
+    try { url = new URL(config.github); } catch { url = null; }
+    if (url && url.protocol === 'https:' && url.hostname === 'github.com') {
+      const link = document.createElement('a');
+      link.className = button.className;
+      link.innerHTML = button.innerHTML;
+      link.href = url.href;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.setAttribute('aria-label', '访问星月晓梦的 GitHub 主页（在新标签页打开）');
+      button.replaceWith(link);
+    } else button.addEventListener('click', () => dialog.showModal());
+  });
+  document.querySelector('.dialog-close').addEventListener('click', () => dialog.close());
+  dialog.addEventListener('click', event => { if (event.target === dialog) { const rect = dialog.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) dialog.close(); } });
+  document.querySelectorAll('.copy-qq').forEach(button => button.addEventListener('click', async () => {
+    const value = config.qq || '1003329649';
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText(value);
+      notify('QQ 号已复制：' + value);
+    } catch {
+      const field = document.createElement('textarea');
+      field.value = value;
+      field.style.cssText = 'position:fixed;left:-9999px;top:0';
+      (dialog.open ? dialog : document.body).append(field);
+      field.select();
+      let copied = false;
+      try { copied = document.execCommand('copy'); } catch { /* Show number for manual copying. */ }
+      field.remove();
+      button.focus();
+      notify(copied ? 'QQ 号已复制：' + value : '请手动复制 QQ 号：' + value);
+    }
+  }));
+  // Atmospheric motion is optional and pauses while the page is in the background.
+  const ambient = document.querySelector('.ambient');
+  if (!reduceMotion.matches) {
+    for (let i = 0; i < 18; i++) {
+      const mote = document.createElement('span');
+      mote.className = 'mote';
+      mote.style.setProperty('--left', `${(i * 37) % 100}%`);
+      mote.style.setProperty('--duration', `${18 + i % 7 * 3}s`);
+      mote.style.setProperty('--delay', `${-i * 2.7}s`);
+      ambient.append(mote);
+    }
+  }
+  document.addEventListener('visibilitychange', () => {
+    ambient.querySelectorAll('.mote').forEach(mote => { mote.style.animationPlayState = document.hidden ? 'paused' : 'running'; });
+  });
+  const pointerDevice = window.matchMedia('(hover: hover) and (pointer: fine)');
+  let frame;
+  document.addEventListener('pointermove', event => {
+    if (!pointerDevice.matches || reduceMotion.matches || document.body.classList.contains('select-open')) return;
+    cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(() => {
+      const x = (event.clientX / innerWidth - .5) * -14;
+      const y = (event.clientY / innerHeight - .5) * -10;
+      document.documentElement.style.setProperty('--scene-x', `${x}px`);
+      document.documentElement.style.setProperty('--scene-y', `${y}px`);
+    });
+  }, { passive: true });
+  document.querySelectorAll('.intro-card, .directory-card, .route-picker .submenu a').forEach(card => card.addEventListener('pointermove', event => {
+    if (!pointerDevice.matches || reduceMotion.matches) return;
+    const rect = card.getBoundingClientRect();
+    card.style.setProperty('--card-x', `${event.clientX - rect.left}px`);
+    card.style.setProperty('--card-y', `${event.clientY - rect.top}px`);
+  }, { passive: true }));
+})();
