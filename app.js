@@ -65,8 +65,8 @@
       pageContainer.classList.add('is-entering');
       routeTimer = setTimeout(() => {
         if (revision === routeRevision) pageContainer.classList.remove('is-entering');
-      }, 520);
-    }, 160);
+      }, 240);
+    }, 100);
   }
   function stopRouteMotion() {
     clearTimeout(routeTimer);
@@ -78,6 +78,29 @@
       renderPage(readRoute());
     }
   });
+  function prepareRouteFade(page) {
+    pageContainer.querySelectorAll('.route-fade, .route-surface').forEach(element => element.classList.remove('route-fade', 'route-surface'));
+    const surfaces = '.glass, .button.secondary';
+    function visit(element) {
+      if (element.hidden) return;
+      // Glass stays opaque: interpolate its paint and blur, then fade its contents.
+      if (element.matches(surfaces)) {
+        const style = getComputedStyle(element);
+        element.style.setProperty('--route-background', style.backgroundColor);
+        element.style.setProperty('--route-border', style.borderTopColor);
+        element.style.setProperty('--route-color', style.color);
+        element.style.setProperty('--route-shadow', style.boxShadow);
+        element.style.setProperty('--route-backdrop', style.backdropFilter || style.webkitBackdropFilter || 'none');
+        element.classList.add('route-surface');
+        [...element.children].forEach(visit);
+      } else if (!element.querySelector(surfaces)) {
+        element.classList.add('route-fade');
+      } else {
+        [...element.children].forEach(visit);
+      }
+    }
+    [...page.children].forEach(visit);
+  }
   function renderPage({ page, section }) {
     const navigationChanged = renderedRoute !== `${page}/${section || ''}`;
     renderedRoute = `${page}/${section || ''}`;
@@ -107,6 +130,7 @@
     closeNavigation();
     rendered = true;
     document.dispatchEvent(new CustomEvent('site:pagechange', { detail: { page, section } }));
+    prepareRouteFade(document.querySelector(`#page-${page}`));
     if (navigationChanged) {
       window.scrollTo({ top: 0, behavior: 'instant' });
       const title = document.querySelector(`#page-${page} h1`);
