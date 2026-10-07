@@ -23,10 +23,10 @@
     noticeTimer = setTimeout(() => toast.classList.remove('visible'), 3200);
   }
   function move(x, y) {
-    const scale = mobile.matches ? 1.09 : 1.045;
+    const scale = mobile.matches ? 1.13 : 1.045;
     // The overscan must always exceed the offset, including narrow landscape screens.
-    const limitX = Math.max(0, Math.min(mobile.matches ? 12 : 15, innerWidth * (scale - 1) / 2 - 2));
-    const limitY = Math.max(0, Math.min(mobile.matches ? 9 : 11, innerHeight * (scale - 1) / 2 - 2));
+    const limitX = Math.max(0, Math.min(mobile.matches ? 18 : 15, innerWidth * (scale - 1) / 2 - 2));
+    const limitY = Math.max(0, Math.min(mobile.matches ? 14 : 11, innerHeight * (scale - 1) / 2 - 2));
     target = { x: clamp(x, limitX), y: clamp(y, limitY) };
     if (!frame) frame = requestAnimationFrame(() => {
       frame = 0;
@@ -55,7 +55,7 @@
     const beta = angleDelta(event.beta, baseline.beta), gamma = angleDelta(event.gamma, baseline.gamma);
     const x = gamma * Math.cos(angle) + beta * Math.sin(angle);
     const y = beta * Math.cos(angle) - gamma * Math.sin(angle);
-    move(-x / 25 * 12, -y / 25 * 9);
+    move(-x / 25 * 18, -y / 25 * 14);
   }
   function listen(manual = false) {
     window.removeEventListener('deviceorientation', tilt);
@@ -123,7 +123,7 @@
   window.screen?.orientation?.addEventListener('change', center);
   window.addEventListener('orientationchange', center, { passive: true });
   function refresh() {
-    root.style.setProperty('--scene-scale', mobile.matches ? '1.09' : '1.045');
+    root.style.setProperty('--scene-scale', mobile.matches ? '1.13' : '1.045');
     if (enabled && (!mobile.matches || reduce.matches)) stop();
     center();
     updateButton();
