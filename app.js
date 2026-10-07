@@ -12,7 +12,9 @@
   const backButton = document.querySelector('#page-back');
   const footerContact = document.querySelector('#footer-contact');
   const pageContainer = document.querySelector('#page-container');
+  const pageWipe = document.querySelector('.page-wipe');
   let routeTimer;
+  let screenBlurTimer;
   let routeRevision = 0;
   let toastTimer;
   function notify(message) {
@@ -57,6 +59,8 @@
     // Keep the old view visible during departure; only the latest request may render.
     void pageContainer.offsetWidth;
     pageContainer.classList.add('is-leaving');
+    pageWipe.classList.add('switching');
+    screenBlurTimer = setTimeout(() => pageWipe.classList.remove('switching'), 220);
     routeTimer = setTimeout(() => {
       if (revision !== routeRevision) return;
       renderPage(next);
@@ -70,7 +74,9 @@
   }
   function stopRouteMotion() {
     clearTimeout(routeTimer);
+    clearTimeout(screenBlurTimer);
     pageContainer.classList.remove('is-leaving', 'is-entering');
+    pageWipe.classList.remove('switching');
   }
   reduceMotion.addEventListener('change', () => {
     if (reduceMotion.matches) {
@@ -79,23 +85,43 @@
     }
   });
   function prepareRouteFade(page) {
-    pageContainer.querySelectorAll('.route-fade, .route-surface').forEach(element => element.classList.remove('route-fade', 'route-surface'));
-    const surfaces = '.glass, .button.secondary';
+    pageContainer.querySelectorAll('.route-fade, .route-surface, .route-branch').forEach(element => element.classList.remove('route-fade', 'route-surface', 'route-branch'));
+    const surfaces = new Map();
+    const branches = new Set();
+    function inspect(element) {
+      // Include hidden panels: they can be opened before the route fade finishes.
+      const style = getComputedStyle(element);
+      const backdrop = style.backdropFilter || style.webkitBackdropFilter || 'none';
+      let containsSurface = backdrop !== 'none';
+      if (containsSurface) {
+        surfaces.set(element, {
+          background: style.backgroundColor, border: style.borderTopColor,
+          color: style.color, shadow: style.boxShadow, backdrop
+        });
+      }
+      for (const child of element.children) {
+        if (inspect(child)) containsSurface = true;
+      }
+      if (containsSurface) branches.add(element);
+      return containsSurface;
+    }
+    inspect(page);
     function visit(element) {
       if (element.hidden) return;
       // Glass stays opaque: interpolate its paint and blur, then fade its contents.
-      if (element.matches(surfaces)) {
-        const style = getComputedStyle(element);
-        element.style.setProperty('--route-background', style.backgroundColor);
-        element.style.setProperty('--route-border', style.borderTopColor);
+      if (surfaces.has(element)) {
+        const style = surfaces.get(element);
+        element.style.setProperty('--route-background', style.background);
+        element.style.setProperty('--route-border', style.border);
         element.style.setProperty('--route-color', style.color);
-        element.style.setProperty('--route-shadow', style.boxShadow);
-        element.style.setProperty('--route-backdrop', style.backdropFilter || style.webkitBackdropFilter || 'none');
+        element.style.setProperty('--route-shadow', style.shadow);
+        element.style.setProperty('--route-backdrop', style.backdrop);
         element.classList.add('route-surface');
         [...element.children].forEach(visit);
-      } else if (!element.querySelector(surfaces)) {
+      } else if (!branches.has(element)) {
         element.classList.add('route-fade');
       } else {
+        element.classList.add('route-branch');
         [...element.children].forEach(visit);
       }
     }
