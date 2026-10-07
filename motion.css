@@ -78,7 +78,7 @@
 }
 @keyframes siteScreenBlur {
   0%, 100% { backdrop-filter: blur(0px); -webkit-backdrop-filter: blur(0px); }
-  42% { backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+  42% { backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
 }
 @keyframes siteFadeOut { from { opacity: 1; } to { opacity: 0; } }
 @keyframes siteFadeIn { from { opacity: 0; } to { opacity: 1; } }
