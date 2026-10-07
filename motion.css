@@ -1,6 +1,5 @@
 /* Shared interaction motion; board squares keep their original dimensions. */
-:root { --motion-ease: cubic-bezier(.22,1,.36,1); view-transition-name: none; }
-.page-container { view-transition-name: page-content; }
+:root { --motion-ease: cubic-bezier(.22,1,.36,1); }
 .page-wipe { display: none; }
 .page, .page.active .page-heading, .page.active .contact-card { animation: none; }
 
@@ -41,36 +40,25 @@
 }
 :is(button, .button):disabled { scale: 1; translate: none; }
 
-::view-transition { pointer-events: none; }
-::view-transition-group(page-content) {
-  animation-duration: 520ms;
-  animation-timing-function: var(--motion-ease);
-}
-::view-transition-image-pair(page-content) { isolation: isolate; }
-::view-transition-old(page-content) {
-  mix-blend-mode: normal;
-  animation: viewLeave 240ms cubic-bezier(.4,0,1,1) both;
-}
-::view-transition-new(page-content) {
-  mix-blend-mode: normal;
-  animation: viewArrive 520ms var(--motion-ease) both;
-}
-@keyframes viewLeave {
+.page-container.is-leaving { animation: siteViewLeave 160ms ease-in both; }
+.page-container.is-entering { animation: siteViewArrive 520ms var(--motion-ease) both; }
+.calc-panel { animation: panelArrive 420ms var(--motion-ease) both; }
+@keyframes siteViewLeave {
   from { opacity: 1; transform: translateY(0) scale(1); }
   to { opacity: 0; transform: translateY(-16px) scale(.985); }
 }
-@keyframes viewArrive {
+@keyframes siteViewArrive {
   from { opacity: 0; transform: translateY(30px) scale(.99); filter: blur(3px); }
   to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
 }
-@media (max-width: 650px) {
-  ::view-transition-group(page-content) { animation-duration: 420ms; }
-  ::view-transition-new(page-content) { animation-duration: 420ms; }
+@keyframes panelArrive {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 @media (prefers-reduced-motion: reduce) {
   .contact-card::after { display: none; }
   :is(button, a.button, .nav-item, .intro-card, .directory-card, .directory-back, .submenu a, .answer-option):is(:active, .is-pressed) {
     scale: 1; translate: none; transform: none; transition: none;
   }
-  ::view-transition-group(page-content), ::view-transition-old(page-content), ::view-transition-new(page-content) { animation: none; }
+  .page-container.is-leaving, .page-container.is-entering, .calc-panel { animation: none; }
 }

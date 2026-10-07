@@ -12,8 +12,7 @@
   const backButton = document.querySelector('#page-back');
   const footerContact = document.querySelector('#footer-contact');
   const pageContainer = document.querySelector('#page-container');
-  let routeTransition;
-  let routeEntrance;
+  let routeTimer;
   let routeRevision = 0;
   let toastTimer;
   function notify(message) {
@@ -48,36 +47,35 @@
   function showPage() {
     const next = readRoute();
     const revision = ++routeRevision;
-    routeTransition?.skipTransition();
-    routeEntrance?.cancel();
+    stopRouteMotion();
     closeNavigation();
     if (renderedRoute === `${next.page}/${next.section || ''}`) return;
     if (!rendered || reduceMotion.matches) {
       renderPage(next);
       return;
     }
-    if (typeof document.startViewTransition === 'function') {
-      // Capture the outgoing view before switching game/tool panels as well as pages.
-      const transition = document.startViewTransition(() => {
-        if (revision === routeRevision) renderPage(next);
-      });
-      routeTransition = transition;
-      transition.ready.catch(() => {});
-      transition.finished.then(() => {
-        if (routeTransition === transition) routeTransition = null;
-      }, () => {});
-    } else {
+    // Keep the old view visible during departure; only the latest request may render.
+    void pageContainer.offsetWidth;
+    pageContainer.classList.add('is-leaving');
+    routeTimer = setTimeout(() => {
+      if (revision !== routeRevision) return;
       renderPage(next);
-      routeEntrance = pageContainer.animate([
-        { opacity: 0, transform: 'translateY(24px) scale(.99)' },
-        { opacity: 1, transform: 'translateY(0) scale(1)' }
-      ], { duration: 480, easing: 'cubic-bezier(.22,1,.36,1)' });
-    }
+      pageContainer.classList.remove('is-leaving');
+      void pageContainer.offsetWidth;
+      pageContainer.classList.add('is-entering');
+      routeTimer = setTimeout(() => {
+        if (revision === routeRevision) pageContainer.classList.remove('is-entering');
+      }, 520);
+    }, 160);
+  }
+  function stopRouteMotion() {
+    clearTimeout(routeTimer);
+    pageContainer.classList.remove('is-leaving', 'is-entering');
   }
   reduceMotion.addEventListener('change', () => {
     if (reduceMotion.matches) {
-      routeTransition?.skipTransition();
-      routeEntrance?.cancel();
+      stopRouteMotion();
+      renderPage(readRoute());
     }
   });
   function renderPage({ page, section }) {
