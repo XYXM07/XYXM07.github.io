@@ -3,8 +3,6 @@
   const L = window.HubLogic;
   const $ = selector => document.querySelector(selector);
   const all = selector => [...document.querySelectorAll(selector)];
-  function savedScore(key) { try { return Math.max(0, Number(localStorage.getItem(key)) || 0); } catch { return 0; } }
-  function saveScore(key, value) { try { localStorage.setItem(key, String(value)); } catch { /* Storage is optional. */ } }
   let game = 'snake', tool = 'calculator';
   function selectTab(kind, name) {
     const keys = all(`[data-${kind}]`).map(button => button.dataset[kind]);
@@ -36,7 +34,7 @@
   const canvas = $('#snake-canvas'), ctx = canvas.getContext('2d');
   const size = 18, cell = canvas.width / size;
   let snake, food, direction, pendingDirection, snakeState = 'ready', snakeScore = 0, snakeClock;
-  let snakeBest = savedScore('xyxm-snake-best');
+  let snakeBest = 0;
   function nextFood() {
     const empty = [];
     for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (!snake.some(p => p.x === x && p.y === y)) empty.push({ x, y });
@@ -50,6 +48,7 @@
     snake.forEach((part, index) => { ctx.fillStyle = index === 0 ? '#edf4d8' : '#a0cebe'; ctx.fillRect(part.x * cell + 2, part.y * cell + 2, cell - 4, cell - 4); });
   }
   function updateSnake() {
+    window.GameExchange?.observe('snake', snakeScore);
     $('#snake-score').textContent = snakeScore; $('#snake-best').textContent = snakeBest;
     const overlay = $('#snake-overlay'); overlay.hidden = snakeState === 'running';
     overlay.textContent = { ready: '准备好，出发。', paused: '休息一下，再继续。', dead: '这一局结束了。', won: '你填满了整个棋盘。' }[snakeState] || '';
@@ -67,7 +66,7 @@
     if (next.dead) { clearInterval(snakeClock); snakeState = 'dead'; $('#snake-status').textContent = `游戏结束，本局 ${snakeScore} 分。`; updateSnake(); return; }
     snake = next.body;
     if (next.ate) {
-      snakeScore += 10; if (snakeScore > snakeBest) { snakeBest = snakeScore; saveScore('xyxm-snake-best', snakeBest); }
+      snakeScore += 10; if (snakeScore > snakeBest) { snakeBest = snakeScore; }
       food = nextFood(); $('#snake-status').textContent = `吃到食物，当前 ${snakeScore} 分。`;
       if (!food) { clearInterval(snakeClock); snakeState = 'won'; $('#snake-status').textContent = '挑战完成，你填满了整个棋盘！'; }
     }
@@ -94,7 +93,7 @@
   resetSnake();
 
   // 2048: new tiles spawn only after a move changes the board.
-  let tiles, tilesScore = 0, tilesBest = savedScore('xyxm-2048-best'), reached2048 = false;
+  let tiles, tilesScore = 0, tilesBest = 0, reached2048 = false;
   function spawnTile() { const empty = tiles.map((v, i) => v === 0 ? i : -1).filter(i => i !== -1); if (empty.length) tiles[empty[Math.floor(Math.random() * empty.length)]] = Math.random() < .9 ? 2 : 4; }
   let tilesAnimating = false, tilesAnimationClock, tilesGeneration = 0;
   function tileElement(value, index) {
@@ -103,6 +102,7 @@
     tile.style.setProperty('--col', index % 4); tile.style.setProperty('--row', Math.floor(index / 4)); return tile;
   }
   function renderTiles(pop = false) {
+    window.GameExchange?.observe('2048', tilesScore);
     const board = $('#tiles-board'); board.replaceChildren();
     for (let i = 0; i < 16; i++) { const slot = document.createElement('div'); slot.className = 'tile-slot'; board.append(slot); }
     tiles.forEach((value, index) => { if (value) { const tile = tileElement(value, index); if (pop) tile.classList.add('tile-pop'); board.append(tile); } });
@@ -113,8 +113,8 @@
     if (tilesAnimating) return;
     const result = L.move2048(tiles, name);
     if (!result.changed) { if (!L.canMove2048(tiles)) $('#tiles-status').textContent = `没有可移动的位置，本局 ${tilesScore} 分。可以开始新的一局。`; return; }
-    tiles = result.board; tilesScore += result.score; spawnTile();
-    if (tilesScore > tilesBest) { tilesBest = tilesScore; saveScore('xyxm-2048-best', tilesBest); }
+    tiles = result.board; tilesScore += result.score; window.GameExchange?.observe('2048', tilesScore); spawnTile();
+    if (tilesScore > tilesBest) { tilesBest = tilesScore; }
     if (tiles.some(v => v >= 2048) && !reached2048) { reached2048 = true; $('#tiles-status').textContent = '达成 2048！还可以继续挑战更大的数字。'; }
     else $('#tiles-status').textContent = result.score ? `合并成功，增加 ${result.score} 分。` : '继续寻找可以合并的数字。';
     if (!L.canMove2048(tiles)) $('#tiles-status').textContent = `没有可移动的位置，本局 ${tilesScore} 分。可以开始新的一局。`;

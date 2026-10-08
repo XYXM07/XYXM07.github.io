@@ -152,7 +152,7 @@
     });
     document.querySelector('#page-label').textContent = labels[page];
     document.querySelectorAll('.navigation > .disclosure').forEach(button => button.classList.toggle('active', button.getAttribute('aria-controls') === `${page}-menu`));
-    document.title = page === 'home' ? '星月晓梦的个人站' : `${labels[page]} · 星月晓梦`; 
+    document.title = page === 'home' ? '星月晓梦的个人站' : `${labels[page]} · 星月晓梦`;
     closeNavigation();
     rendered = true;
     document.dispatchEvent(new CustomEvent('site:pagechange', { detail: { page, section } }));
@@ -201,11 +201,10 @@
     themeButton.setAttribute('aria-label', light ? '切换为深色主题' : '切换为浅色主题');
     document.querySelector('meta[name="theme-color"]').content = light ? '#487b8a' : '#183544';
   }
-  try { setTheme(localStorage.getItem('star-moon-theme') === 'light'); } catch { setTheme(false); }
+  setTheme(false);
   themeButton.addEventListener('click', () => {
     const light = !document.body.classList.contains('light');
     setTheme(light);
-    try { localStorage.setItem('star-moon-theme', light ? 'light' : 'dark'); } catch { /* Theme works even if storage is disabled. */ }
   });
   mobileButton.addEventListener('click', () => {
     const open = document.body.classList.toggle('nav-open');

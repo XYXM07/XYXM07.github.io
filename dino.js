@@ -5,11 +5,10 @@
   const startButton = $('#dino-start'), pauseButton = $('#dino-pause');
   const jumpButton = $('#dino-jump'), duckButton = $('#dino-duck');
   let state = L.create(), frame = 0, last = 0, night = 0, best = 0;
-  try { best = Math.max(0, Number(localStorage.getItem('xyxm-dino-best')) || 0); } catch {}
   function active() { return !$('#page-games').hidden && !$('#game-dino').hidden && !$('#games-workspace').hidden; }
-  function saveBest() { try { localStorage.setItem('xyxm-dino-best', String(best)); } catch {} }
   function text(selector, value) { const node = $(selector); if (node.textContent !== String(value)) node.textContent = value; }
   function update() {
+    window.GameExchange?.observe('dino', state.score);
     best = Math.max(best, state.score);
     text('#dino-score', state.score); text('#dino-best', best);
     startButton.textContent = state.phase === 'ready' ? '开始游戏' : state.phase === 'paused' ? '继续游戏' : '重新开始';
@@ -110,14 +109,13 @@
     const targetNight = Math.floor(state.score / 500) % 2;
     night += (targetNight - night) * Math.min(1, dt * 2);
     update(); draw();
-    if (state.phase === 'over') saveBest();
-    else frame = requestAnimationFrame(tick);
+    if (state.phase !== 'over') frame = requestAnimationFrame(tick);
   }
   function start(reset = false) {
     if (!active()) return;
     cancelAnimationFrame(frame);
     if (reset || ['ready', 'over'].includes(state.phase)) {
-      saveBest(); state = L.create(state.width, state.height); night = 0;
+      state = L.create(state.width, state.height); night = 0;
     }
     state.phase = 'running'; state.duck = false;
     last = performance.now(); resize(); update(); draw();
@@ -126,7 +124,7 @@
   function pause() {
     if (state.phase !== 'running') return;
     state.phase = 'paused'; state.duck = false;
-    cancelAnimationFrame(frame); frame = 0; saveBest(); update(); draw();
+    cancelAnimationFrame(frame); frame = 0; update(); draw();
   }
   function leap() {
     if (!active()) return;
@@ -167,7 +165,6 @@
   document.addEventListener('site:pagechange', event => { if (event.detail.page !== 'games' || event.detail.section !== 'dino') pause(); else resize(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
   window.addEventListener('blur', pause);
-  window.addEventListener('pagehide', saveBest);
   if (typeof ResizeObserver === 'function') new ResizeObserver(resize).observe(canvas);
   else window.addEventListener('resize', resize);
   update(); resize(); draw();

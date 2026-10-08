@@ -25,11 +25,20 @@
   window.addEventListener('blur', () => release(true));
   document.addEventListener('visibilitychange', () => { if (document.hidden) release(true); });
   reduce.addEventListener('change', () => release(true));
-  const canvas=document.createElement('canvas');canvas.className='pointer-effects';canvas.setAttribute('aria-hidden','true');document.body.append(canvas);const ctx=canvas.getContext('2d');let points=[],bursts=[],frame=0,pendingPoint=null,dpr=1;
-  function resize(){dpr=Math.min(devicePixelRatio||1,2);canvas.width=innerWidth*dpr;canvas.height=innerHeight*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);}
-  function clear(){cancelAnimationFrame(frame);frame=0;pendingPoint=null;points=[];bursts=[];ctx.clearRect(0,0,innerWidth,innerHeight);}
+  const canvas=document.createElement('canvas');canvas.className='pointer-effects';canvas.setAttribute('aria-hidden','true');document.body.append(canvas);const ctx=canvas.getContext('2d');let points=[],bursts=[],frame=0,pendingPoint=null,dpr=1,trailPointer=null;
+  function wipe(){
+    // Clear the entire backing bitmap in physical pixels, independent of its CSS size.
+    ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,canvas.width,canvas.height);ctx.setTransform(dpr,0,0,dpr,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.shadowBlur=0;
+  }
+  function resize(){dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.max(1,Math.round(innerWidth*dpr));canvas.height=Math.max(1,Math.round(innerHeight*dpr));wipe();}
+  function clear(){cancelAnimationFrame(frame);frame=0;pendingPoint=null;points=[];bursts=[];trailPointer=null;wipe();}
+  function point(event){
+    const rect=canvas.getBoundingClientRect();if(!rect.width||!rect.height||!Number.isFinite(event.clientX)||!Number.isFinite(event.clientY))return null;
+    if(event.clientX<rect.left||event.clientY<rect.top||event.clientX>rect.left+rect.width||event.clientY>rect.top+rect.height)return null;
+    return {x:(event.clientX-rect.left)*canvas.width/(rect.width*dpr),y:(event.clientY-rect.top)*canvas.height/(rect.height*dpr),time:performance.now()};
+  }
   function draw(now){
-    frame=0;if(pendingPoint){points.push(pendingPoint);pendingPoint=null;}points=points.filter(p=>now-p.time<460);bursts=bursts.filter(b=>now-b.time<520);ctx.clearRect(0,0,innerWidth,innerHeight);ctx.globalCompositeOperation='screen';
+    frame=0;if(document.hidden||reduce.matches){clear();return;}if(pendingPoint){points.push(pendingPoint);pendingPoint=null;}points=points.filter(p=>now-p.time<460);bursts=bursts.filter(b=>now-b.time<520);wipe();ctx.globalCompositeOperation='screen';
     for(let i=1;i<points.length;i++){const age=now-points[i].time,alpha=Math.max(0,1-age/460)*.65;ctx.strokeStyle='rgba(184,226,222,'+alpha+')';ctx.lineWidth=Math.max(.6,2.6*(1-age/460));ctx.lineCap='round';ctx.beginPath();ctx.moveTo(points[i-1].x,points[i-1].y);ctx.lineTo(points[i].x,points[i].y);ctx.stroke();}
     bursts.forEach(b=>{
       const t=(now-b.time)/520,ease=1-Math.pow(1-t,3),alpha=Math.pow(1-t,1.5);ctx.save();ctx.translate(b.x,b.y);ctx.shadowColor='#c2f5ff';ctx.shadowBlur=5;ctx.lineWidth=1.6*(1-t)+.3;ctx.strokeStyle='rgba(212,250,255,'+alpha+')';
@@ -38,7 +47,14 @@
     });ctx.globalCompositeOperation='source-over';if(points.length||bursts.length)frame=requestAnimationFrame(draw);
   }
   // Coalesce input within each paint; use every display frame without a time or point-count cap.
-  document.addEventListener('pointermove',e=>{if(reduce.matches||!fine.matches||e.pointerType==='touch'||document.body.classList.contains('select-open'))return;pendingPoint={x:e.clientX,y:e.clientY,time:performance.now()};if(!frame)frame=requestAnimationFrame(draw);},{passive:true});
-  document.addEventListener('pointerdown',e=>{if(reduce.matches||e.button!==0)return;const particles=Array.from({length:7+Math.floor(Math.random()*5)},()=>({angle:Math.random()*Math.PI*2,distance:12+Math.random()*26,size:1+Math.random()*1.6,gold:Math.random()<.35}));bursts.push({x:e.clientX,y:e.clientY,time:performance.now(),particles});if(bursts.length>10)bursts.shift();if(!frame)frame=requestAnimationFrame(draw);},{passive:true});
-  document.addEventListener('visibilitychange',()=>{if(document.hidden)clear();});reduce.addEventListener('change',clear);window.addEventListener('resize',()=>{clear();resize();});window.addEventListener('blur',clear);resize();
+  document.addEventListener('pointermove',e=>{if(reduce.matches||!fine.matches||e.pointerType==='touch'||document.body.classList.contains('select-open')){clear();return;}if(trailPointer!==null&&trailPointer!==e.pointerId)clear();const next=point(e);if(!next){clear();return;}trailPointer=e.pointerId;pendingPoint=next;if(!frame)frame=requestAnimationFrame(draw);},{passive:true});
+  document.addEventListener('pointerdown',e=>{if(reduce.matches||e.button!==0||document.body.classList.contains('select-open'))return;const origin=point(e);if(!origin)return;const particles=Array.from({length:7+Math.floor(Math.random()*5)},()=>({angle:Math.random()*Math.PI*2,distance:12+Math.random()*26,size:1+Math.random()*1.6,gold:Math.random()<.35}));bursts.push({...origin,particles});if(bursts.length>10)bursts.shift();if(!frame)frame=requestAnimationFrame(draw);},{passive:true});
+  function cancel(){release(true);clear();}
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)cancel();});reduce.addEventListener('change',cancel);fine.addEventListener('change',cancel);
+  // Pointer capture in game canvases can end without a final move or pointerup.
+  for(const type of ['pointercancel','lostpointercapture','pointerleave'])document.addEventListener(type,cancel);
+  for(const type of ['site:pagechange','hub:selection'])document.addEventListener(type,cancel);
+  window.addEventListener('hashchange',cancel);window.addEventListener('scroll',cancel,{passive:true,capture:true});window.addEventListener('pagehide',cancel);
+  window.addEventListener('resize',()=>{cancel();resize();});window.addEventListener('blur',cancel);
+  window.visualViewport?.addEventListener('resize',()=>{cancel();resize();});window.visualViewport?.addEventListener('scroll',cancel,{passive:true});resize();
 })();

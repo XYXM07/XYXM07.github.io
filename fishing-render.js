@@ -1,0 +1,35 @@
+(function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory(require('./ocean-art.js'),require('./fishing-logic.js'));else root.FishingView=factory(root.OceanArt,root.FishingLogic);})(typeof window!=='undefined'?window:globalThis,(Art,Logic)=>{
+  'use strict';const SCALE=Logic.SCALE,SURFACE=460,TAU=Math.PI*2;
+  // A long continuous sea; the camera eases from the boat view to the hook anchor.
+  function camera(run){return Math.max(0,run.depth*SCALE+(SURFACE-300)*(1-Math.exp(-run.depth/25)));}
+  function screenY(depth,run){return SURFACE+depth*SCALE-camera(run);}
+  function text(c,label,x,y,size=13,color='#e6f0dc',align='left'){c.fillStyle=color;c.textAlign=align;c.font=`${size}px "Microsoft YaHei", sans-serif`;c.fillText(label,x,y);}
+  function circle(c,x,y,r,color){c.fillStyle=color;c.beginPath();c.arc(x,y,r,0,TAU);c.fill();}
+  function reef(c,x,y,size,color,phase){c.save();c.translate(x,y);c.strokeStyle=color;c.lineCap='round';function branch(length,angle,width,level){c.save();c.rotate(angle);c.lineWidth=width;c.beginPath();c.moveTo(0,0);c.quadraticCurveTo(Math.sin(phase)*5,-length*.5,0,-length);c.stroke();c.translate(0,-length);if(level){branch(length*.6,-.55,width*.65,level-1);branch(length*.65,.6,width*.65,level-1);}c.restore();}branch(size,0,6,2);c.restore();}
+  function draw(c,s,r,L,reduced=false){const cam=camera(r),t=reduced?0:r.time,depth=r.depth,underwater=r.phase==='idle'?0:Math.min(1,depth/12);c.fillStyle='#477f84';c.fillRect(0,0,800,600);
+    // Every world object shares the same translation: sea, sky, boat, fish and reefs.
+    c.save();c.translate(0,-cam);
+    const sky=c.createLinearGradient(0,0,0,SURFACE);sky.addColorStop(0,'#a5c5c7');sky.addColorStop(1,'#d4d9b9');c.fillStyle=sky;c.fillRect(0,0,800,SURFACE);
+    const sea=c.createLinearGradient(0,SURFACE,0,SURFACE+(L.WORLD_DEPTH+50)*SCALE);sea.addColorStop(0,'#477f84');sea.addColorStop(.28,'#2b606d');sea.addColorStop(.62,'#1b3d54');sea.addColorStop(1,'#10283d');c.fillStyle=sea;c.fillRect(0,SURFACE,800,(L.WORLD_DEPTH+75)*SCALE);
+    for(let i=0;i<4;i++){const x=((i*237+t*(i%2?-4:5))%950+950)%950-65,y=70+i%2*100;c.save();c.globalAlpha=.32;circle(c,x,y,16,'#f4f0d3');circle(c,x+23,y-7,22,'#f4f0d3');circle(c,x+50,y,14,'#f4f0d3');c.restore();}
+    c.fillStyle='#cbd6b07a';c.beginPath();c.moveTo(0,SURFACE);c.lineTo(0,SURFACE-34);c.lineTo(72,SURFACE-61);c.lineTo(144,SURFACE-73);c.lineTo(218,SURFACE);c.fill();c.fillStyle='#a1c5b26b';c.beginPath();c.moveTo(600,SURFACE);c.lineTo(676,SURFACE-50);c.lineTo(720,SURFACE-25);c.lineTo(800,SURFACE-59);c.lineTo(800,SURFACE);c.fill();
+    const bob=Math.sin(t*1.3)*2;c.save();c.translate(400,SURFACE+bob);c.fillStyle='#dfce9c';c.beginPath();c.moveTo(-63,-15);c.lineTo(65,-15);c.lineTo(44,12);c.lineTo(-39,12);c.closePath();c.fill();c.strokeStyle='#4f6f68';c.lineWidth=4;c.beginPath();c.moveTo(-65,-16);c.lineTo(64,-16);c.stroke();c.fillStyle='#f1e7c4';c.fillRect(-31,-45,44,28);c.fillStyle='#45646c';c.fillRect(-23,-37,14,12);c.fillStyle='#49676a';c.beginPath();c.moveTo(-37,-44);c.lineTo(20,-44);c.lineTo(13,-51);c.lineTo(-30,-51);c.fill();circle(c,35,-24,5,'#eddfb6');c.strokeStyle='#dfc58f';c.lineWidth=3;c.beginPath();c.moveTo(27,-20);c.lineTo(19,-67);c.lineTo(37,-84);c.stroke();c.restore();
+    c.strokeStyle='#d0dfca9a';c.lineWidth=1.5;c.beginPath();for(let x=0;x<=800;x+=8){const y=SURFACE+Math.sin(x*.026+t)*2;x?c.lineTo(x,y):c.moveTo(x,y);}c.stroke();
+    c.save();c.globalAlpha=underwater;
+    for(let i=0;i<5;i++){const x=60+i*175,beam=c.createLinearGradient(0,SURFACE,0,SURFACE+(L.WORLD_DEPTH+25)*SCALE);beam.addColorStop(0,'#d6e7bc12');beam.addColorStop(1,'#d6e7bc00');c.fillStyle=beam;c.beginPath();c.moveTo(x,SURFACE);c.lineTo(x+28,SURFACE);c.lineTo(x+290,SURFACE+(L.WORLD_DEPTH+25)*SCALE);c.lineTo(x+150,SURFACE+(L.WORLD_DEPTH+25)*SCALE);c.fill();}
+    for(let i=0;i<300;i++){const x=(i*173+Math.sin(t*.2+i)*5)%800,y=SURFACE+((i*173-t*10)%((L.WORLD_DEPTH+25)*SCALE)+((L.WORLD_DEPTH+25)*SCALE))%((L.WORLD_DEPTH+25)*SCALE);if(y-cam>-5&&y-cam<605)circle(c,x,y,1+i%3*.6,'#d8e6ce20');}
+    const shelves=Array.from({length:Math.ceil(L.WORLD_DEPTH/35)},(_,i)=>20+i*35).map((d,i)=>({d,x:i%2?688:0,w:i%2?112:125}));
+    for(const [i,shelf]of shelves.entries()){const y=SURFACE+shelf.d*SCALE;if(y-cam<-100||y-cam>700)continue;c.fillStyle=i%2?'#43687585':'#476e7585';c.beginPath();c.moveTo(shelf.x,y+70);c.lineTo(shelf.x,y+8);c.quadraticCurveTo(shelf.x+shelf.w*.45,y-25,shelf.x+shelf.w,y+10);c.lineTo(shelf.x+shelf.w,y+70);c.fill();for(let n=0;n<3;n++)reef(c,shelf.x+15+n*shelf.w/3,y+6,24+n*5,n%2?'#bca79769':'#93b9a679',t*.4+n+i);}
+    for(let d=10;d<=L.WORLD_DEPTH+50;d+=10){const y=SURFACE+d*SCALE;if(y-cam<-20||y-cam>620)continue;c.strokeStyle='#d1e0c633';c.lineWidth=1;c.beginPath();c.moveTo(15,y);c.lineTo(25,y);c.stroke();text(c,d+' m',32,y+4,10,'#d1e0c685');}
+    for(const f of r.fish){if(f.caught)continue;const y=SURFACE+L.fishY(f,t);if(y-cam<-60||y-cam>650)continue;Art.fish(c,f.type,f.x,y,L.SPECIES[f.type].size,f.vx,t+f.wobble);}
+    c.restore();
+    const hookY=SURFACE+r.depth*SCALE;if(r.phase!=='idle'){c.strokeStyle='#e8d9a880';c.lineWidth=1.2;c.beginPath();c.moveTo(437,SURFACE-81);c.quadraticCurveTo(420,hookY-100,r.x,hookY);c.stroke();}
+    if(r.phase!=='idle'){c.save();c.translate(r.x,hookY);c.strokeStyle='#f2d593';c.lineWidth=3;c.lineCap='round';c.beginPath();c.moveTo(0,-8);c.lineTo(0,12);c.bezierCurveTo(0,28,17,26,16,12);c.lineTo(12,15);c.stroke();circle(c,0,-10,3,'#f2d593');c.restore();for(let i=r.basket.length-1;i>=0;i--){const f=r.basket[i],fan=r.basket.length>1?(i/(r.basket.length-1)-.5)*1.15:0,sway=reduced?0:(r.swing||0)+Math.sin(t*3+i)*.025;Art.hanging(c,f.type,r.x+12,hookY+15,Math.min(68,Math.max(34,L.SPECIES[f.type].size*.75)),fan+sway,t);}}
+    c.restore();
+    c.fillStyle='#153648a8';c.beginPath();c.roundRect(570,16,213,48,14);c.fill();text(c,r.phase==='diving'?'下潜中':r.phase==='reeling'?(r.basket.length===L.CAPACITIES[s.capacityLevel]?'鱼篓已满 · 快速收竿':'收线捕鱼'):'船边待命',590,37,12,'#e4eaca');text(c,Math.floor(r.depth)+' m / '+(r.targetDepth??L.DEPTHS[s.depthLevel])+' m',590,54,10,'#b8d4c5');
+    text(c,depth<80?'海风浅湾':depth<180?'珊瑚水域':depth<280?'蓝海回廊':depth<450?'星光深渊':depth<650?'幽蓝断层':depth<850?'冷泉峡谷':depth<1050?'失落海沟':'月光深渊',24,30,12,SURFACE-cam>20?'#365961':'#d3e4ce');
+    if(r.phase==='idle'&&!r.paused){if(r.summary){const prize=r.summary;c.fillStyle='#173f4ddc';c.beginPath();c.roundRect(170,147,460,195,23);c.fill();c.strokeStyle='#d5d9b04d';c.lineWidth=1;c.stroke();text(c,'本 次 收 获',400,185,14,'#c1dacb','center');text(c,prize.total+' 金币',400,243,42,'#f0d593','center');text(c,'带回 '+prize.count+' 尾鱼 · 鱼获 '+prize.value+' 金币'+(prize.bounty?' · 航程奖励 +'+prize.bounty:''),400,281,12,'#d1e4d3','center');text(c,'金币已入账，点击抛竿开始下一次航程',400,318,11,'#b1d2c7','center');}else{text(c,'海风正好，等你抛竿。',400,195,26,'#45646c','center');text(c,'点击「抛竿出发」，开始这次航程',400,230,13,'#55777a','center');}}
+    if(r.paused){c.fillStyle='#102c3c8c';c.fillRect(0,0,800,600);text(c,'海流暂歇',400,280,32,'#f0ebcf','center');text(c,'点击继续，鱼线与鱼群都停在原处。',400,322,14,'#c1dccb','center');}
+  }
+  return {draw,camera,screenY,SCALE,SURFACE,fish:Art.fish};
+});
