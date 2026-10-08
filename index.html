@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="discovery.css">
   <link rel="stylesheet" href="standard.css">
   <link rel="stylesheet" href="studio.css">
-  <link rel="stylesheet" href="plus.css?v=41c8408827a8">
+  <link rel="stylesheet" href="plus.css?v=d4c7f7a0449d">
   <link rel="stylesheet" href="dino.css?v=f0b1b01fb329">
   <link rel="stylesheet" href="motion.css?v=db0fb7272bb9">
   <script src="config.js" defer></script>
@@ -181,12 +181,12 @@
   <form id="cad-properties"><h3>对象属性</h3><p id="cad-selected">请选择一个对象。</p><div class="form-grid"><label>X / 圆心 X<input id="cad-x" type="number" step="any" disabled></label><label>Y / 圆心 Y<input id="cad-y" type="number" step="any" disabled></label><label>终点 X（线段）<input id="cad-x2" type="number" step="any" disabled></label><label>终点 Y（线段）<input id="cad-y2" type="number" step="any" disabled></label><label>半径（圆 / 圆弧）<input id="cad-radius" type="number" min="0.001" step="any" disabled></label><label>线宽<input id="cad-width" type="number" min="0.1" max="10" step="0.1" value="1" disabled></label><label>起始角（圆弧）<input id="cad-angle-start" type="number" step="any" disabled></label><label>结束角（圆弧）<input id="cad-angle-end" type="number" step="any" disabled></label></div><button class="button primary" type="submit" id="cad-apply" disabled>应用属性</button></form>
   <div class="studio-toolbar"><label>导入图纸<input id="cad-file" type="file" accept=".dwg,.dxf,.json"></label><input id="cad-dwg-version" type="hidden" value="2000"><span class="help-note">保存格式：DWG 2000（AC1015），自定义颜色使用近似索引色</span><button id="cad-dwg" class="button primary">保存 DWG</button><button id="cad-dxf" class="button secondary">导出 DXF</button><button id="cad-json" class="button secondary">保存工程 JSON</button><button id="cad-svg" class="button secondary">导出 SVG</button></div><p id="cad-status" role="status">拖动绘制线段、圆或矩形。多段线逐点点击，完成后按 Enter。</p>
 </section><section class="tool-panel studio-tool" id="tool-decibel" aria-label="分贝测试" hidden>
-  <div class="tool-heading"><h2>分贝测试</h2><p>主动开启麦克风后测量输入电平，声音不录制、不上传。默认显示 dBFS；经参考仪器校准后可显示估算声压级。</p></div>
-  <div class="sound-readout"><span id="sound-label">数字输入电平</span><strong id="sound-value">—</strong><span id="sound-unit">dBFS</span><div class="sound-meter" role="meter" aria-label="麦克风输入电平" aria-valuemin="-100" aria-valuemax="0" aria-valuenow="-100" id="sound-meter"><i id="sound-fill"></i></div></div>
+  <div class="tool-heading"><h2>分贝测试</h2><p>主动开启麦克风后测量输入电平，声音不录制、不上传。默认显示麦克风数字电平（dBFS），负数正常。填写参考声级计读数并校准后，可查看估算环境分贝。</p></div>
+  <div class="sound-readout"><span id="sound-label">麦克风数字电平 · 未校准</span><strong id="sound-value">—</strong><span id="sound-unit">dBFS</span><div class="sound-meter" role="meter" aria-label="麦克风输入电平" aria-valuemin="-100" aria-valuemax="0" aria-valuenow="-100" id="sound-meter"><i id="sound-fill"></i></div><p id="sound-help" class="sound-explanation">负数正常：数字电平越接近 0 声音越强。环境分贝需参考声级计校准。</p></div>
   <div class="sound-stats"><span>平均 <b id="sound-average">—</b></span><span>最大 <b id="sound-max">—</b></span><span>测量时长 <b id="sound-time">0 秒</b></span></div>
-  <canvas id="sound-chart" class="sound-chart" width="900" height="170" aria-label="最近一分钟音量曲线"></canvas>
+  <canvas id="sound-chart" class="sound-chart" width="900" height="170" aria-label="最近一分钟麦克风数字电平曲线，单位 dBFS"></canvas><p class="help-note">曲线始终显示麦克风数字电平（dBFS）。</p>
   <div class="mini-actions"><button id="sound-start" class="button primary">开启麦克风</button><button id="sound-stop" class="button secondary" disabled>停止测量</button><button id="sound-reset" class="button secondary">重置统计</button><button id="sound-csv" class="button secondary" disabled>导出测量 CSV</button></div>
-  <div class="form-grid"><label>同一环境的参考读数（dB SPL）<input id="sound-reference" type="number" min="20" max="140" step="0.1" placeholder="例如专业声级计读数 65.0"></label><div class="mini-actions"><button id="sound-calibrate" class="button secondary" disabled>用当前电平校准</button><button id="sound-uncalibrate" class="button secondary">取消校准</button></div></div>
+  <div class="form-grid"><label>同一环境的参考读数（dB SPL）<input id="sound-reference" type="number" min="20" max="140" step="0.1" placeholder="例如专业声级计读数 65.0"></label><div class="mini-actions"><button id="sound-calibrate" class="button secondary" disabled>校准为环境分贝</button><button id="sound-uncalibrate" class="button secondary" disabled>取消校准</button></div></div>
   <p id="sound-status" role="status">麦克风尚未开启。</p><p class="help-note">未经校准的 dBFS 不是环境声压级。校准值只在本次页面内有效，估算结果不含 A/C 加权，不用于专业噪声评估。离开页面或切到后台会自动关闭麦克风。</p>
 </section><section class="tool-panel studio-tool" id="tool-pdf" aria-label="PDF 工具箱" hidden>
   <div class="tool-heading"><h2>PDF 工具箱</h2><p>合并、提取和重排页面、旋转、图片转 PDF、导出页面图片与文本。文件仅在本机处理，暂不支持加密 PDF 和 OCR。</p></div>
