@@ -26,7 +26,8 @@
   // Browser microphone levels. Sampling and statistical intervals do not cap rendering.
   let stream=null,audio=null,analyser=null,samples=null,frame=0,serial=0,lastSample=0,current=-100,averageEnergy=0,count=0,max=-100,offset=null,records=[],history=[];
   const active=()=>!$('#page-tools').hidden&&!$('#tool-decibel').hidden&&!$('#tools-workspace').hidden;
-  const defaultOffset=100,estimatedMode=()=>$('#sound-mode').value==='estimate',effectiveOffset=()=>offset??defaultOffset;
+  let soundMode='estimate';$('#sound-mode').value=soundMode;
+  const defaultOffset=100,estimatedMode=()=>soundMode==='estimate',effectiveOffset=()=>offset??defaultOffset;
   const value=db=>Math.max(-100,db)+(estimatedMode()?effectiveOffset():0),unit=()=>!estimatedMode()?'dBFS':offset===null?'dB（未校准估算）':'dB SPL（估算）';
   const measurementMessage=()=>!estimatedMode()?'测量中：显示麦克风数字电平 dBFS，负数正常。':offset===null?'测量中：使用默认 +100 dB 补偿，显示未校准估算值。':'测量中：显示参考读数校准后的估算环境分贝。';
   function soundStats(){const avg=count?10*Math.log10(Math.max(1e-10,averageEnergy/count)):-100;$('#sound-average').textContent=count?value(avg).toFixed(1)+' '+unit():'—';$('#sound-max').textContent=count?value(max).toFixed(1)+' '+unit():'—';$('#sound-time').textContent=(count/10).toFixed(1)+' 秒';$('#sound-csv').disabled=!records.length;}
@@ -40,9 +41,11 @@
     try{if(!navigator.mediaDevices?.getUserMedia)throw Error('需要 HTTPS 或 localhost，并使用支持麦克风的浏览器');const input=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false},video:false});if(token!==serial||!active()||document.hidden){input.getTracks().forEach(t=>t.stop());return;}stream=input;audio=new (window.AudioContext||window.webkitAudioContext)();await audio.resume();if(token!==serial)return;analyser=audio.createAnalyser();analyser.fftSize=2048;audio.createMediaStreamSource(stream).connect(analyser);samples=new Float32Array(analyser.fftSize);$('#sound-stop').disabled=false;$('#sound-calibrate').disabled=false;$('#sound-status').textContent=measurementMessage();lastSample=performance.now();frame=requestAnimationFrame(tick);
     }catch(e){if(token===serial)stop(e.name==='NotAllowedError'?'麦克风权限未获允许。':e.name==='NotFoundError'?'未找到麦克风。':e.message||'麦克风无法开启。');}};
   $('#sound-stop').onclick=()=>stop();$('#sound-reset').onclick=()=>{count=0;averageEnergy=0;max=-100;records=[];history=[];display();};
-  $('#sound-mode').onchange=()=>{display();if(stream)$('#sound-status').textContent=measurementMessage();};
-  $('#sound-calibrate').onclick=()=>{try{if(!stream||!count||current<=-90)throw Error('请先测量稳定且可辨识的声音，再填写参考仪器读数');if(!$('#sound-reference').value.trim())throw Error('请填写参考读数');offset=L.calibration(current,Number($('#sound-reference').value));$('#sound-mode').value='estimate';$('#sound-status').textContent='本次页面已校准；结果为估算声压级。';display();}catch(e){$('#sound-status').textContent=e.message;}};
-  $('#sound-uncalibrate').onclick=()=>{offset=null;$('#sound-mode').value='estimate';display();$('#sound-status').textContent='已恢复默认 +100 dB 补偿；显示未校准估算值。';};
+  $('#sound-mode').onchange=()=>{soundMode=$('#sound-mode').value==='digital'?'digital':'estimate';display();if(stream)$('#sound-status').textContent=measurementMessage();};
+  function setSoundMode(mode){soundMode=mode;$('#sound-mode').value=mode;$('#sound-mode').dispatchEvent(new Event('change',{bubbles:true}));}
+  window.addEventListener('pageshow',()=>setSoundMode(soundMode));
+  $('#sound-calibrate').onclick=()=>{try{if(!stream||!count||current<=-90)throw Error('请先测量稳定且可辨识的声音，再填写参考仪器读数');if(!$('#sound-reference').value.trim())throw Error('请填写参考读数');offset=L.calibration(current,Number($('#sound-reference').value));setSoundMode('estimate');$('#sound-status').textContent='本次页面已校准；结果为估算声压级。';}catch(e){$('#sound-status').textContent=e.message;}};
+  $('#sound-uncalibrate').onclick=()=>{offset=null;setSoundMode('estimate');$('#sound-status').textContent='已恢复默认 +100 dB 补偿；显示未校准估算值。';};
   $('#sound-csv').onclick=()=>{if(records.length)download(new Blob([L.csvWrite(records.map(r=>({seconds:r.seconds,dbfs:r.dbfs,estimated:r.dbfs+effectiveOffset(),offset_db:effectiveOffset(),calibration:offset===null?'default_uncalibrated':'reference_calibrated'})))],{type:'text/csv;charset=utf-8'}),'sound-levels.csv');};
   document.addEventListener('hub:selection',e=>{if(e.detail.kind==='tool'&&e.detail.name!=='decibel')stop();});document.addEventListener('site:pagechange',e=>{if(e.detail.page!=='tools'||e.detail.section!=='decibel')stop();});document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});window.addEventListener('pagehide',()=>stop());display();
 })();
