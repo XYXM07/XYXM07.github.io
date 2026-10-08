@@ -1,0 +1,544 @@
+# Parity
+
+What nasjidwg does, release by release, and what it does not. Everything
+here is checked by the test suite, which builds its own fixtures with the
+library's own writers — nothing in this repository is a drawing produced
+by other software.
+
+| Release | Signature | Read | Write | AutoCAD 2027 verdict |
+| --- | --- | --- | --- | --- |
+| R1.4 | MC0.0 … AC1.50 | yes | no | — |
+| R2.6 / R2.10 | AC1003 / AC2.10 | yes | yes | too old to judge |
+| R9 / R10 | AC1004 – AC1006 | yes | yes | too old to judge |
+| R11 / R12 | AC1009 | yes | yes | **opens, AUDIT 0 errors** (gated) |
+| R13 | AC1012 | yes | yes | **opens, AUDIT 0 errors** (gated) |
+| R14 | AC1014 | yes | yes | **opens, AUDIT 0 errors** (gated) |
+| R2000 | AC1015 | yes | yes | **opens, AUDIT 0 errors** (gated) |
+| R2004 | AC1018 | yes | yes (LZ77 pages) | **opens, AUDIT 0 errors** (gated) |
+| R2007 | AC1021 | yes | yes (native RS container) | **opens, AUDIT 0 errors** (gated) |
+| R2010 / R2013 / R2018 | AC1024 / AC1027 / AC1032 | yes | yes (LZ77 pages) | **opens, AUDIT 0 errors** (gated) |
+
+All seven writable release families are regression-gated against AutoCAD
+itself, **every one at zero AUDIT errors**: `node tools/validate-external.mjs`
+opens and AUDITs each one in AutoCAD 2027's Core Console, and fails if any
+of them stops passing.
+
+The R2018 writer additionally survived a heavy-field campaign: the same
+72 MB production drawing (246k entities, AEC content, 9,522 fit splines,
+68 ACIS solids) rewritten in both handle modes — and once more through a
+full DXF round trip — opens in AutoCAD 2027 with **RECOVER and AUDIT at
+0 errors, 0 erased** (the untouched source itself audits 18 errors), and
+its plot matches AutoCAD's plot of the original section for section.
+Eleven writer spellings that our own reader tolerated but AutoCAD did
+not — the R2013+ SPLINE scenario form, multi-solid AcDs payloads, hatch
+spline fit data, forged ellipse normals, true colours collapsed to ACI,
+path-less wipeout IMAGEDEFs, dropped hatch loop-type bits, anonymous
+block naming, mesh linetype inheritance, multi-line hatch patterns in
+the DXF reader, and stale sealed-object re-emission — were each read off
+AutoCAD's own bytes and are pinned by regression tests.
+
+DXF is read and written in both the ASCII and binary forms, at every
+group-code width. The ASCII writer's output is gated in the same external
+run (`DXF` row): the corpus DXF opens in AutoCAD 2027 at **AUDIT 0
+errors**. The campaign that got it there was driven by a 72 MB production
+drawing (AC1032, 232,382 model entities) whose 270 MB DXF now opens with a
+single AUDIT fix — a one-dash linetype broken in the source, which
+AutoCAD's own DXFOUT reproduces identically. DXFIN turned out to be far
+stricter than any DWG reader: one missing group — a LAYER without its
+plot-style 390, an absent empty VIEW table, a `97` inside a spline hatch
+edge, gradient groups in an AC1015 file, an MLINE without its style's
+hard 340 — discards the entire file, and each of those rules is now
+pinned in `test/dxf-acadopen.test.ts`.
+
+### Known limits
+
+- R1.4 (the pre-AC1003 line) is read-only; everything from R2.6 on has a
+  writer.
+- ACAD_TABLE, MULTILEADER, LIGHT and the underlays are application
+  classes and cannot exist in R13/R14; the writer reports them as
+  skipped rather than writing something a reader would not understand.
+- An ASM-dialect kernel stream (the solids of R2010+ files) has no
+  spelling an AC1015 DXF can carry: AutoCAD's own R2000 DXFOUT downgrades
+  the kernel data to the ACIS-400 text dialect — record ids dropped,
+  fields reshaped — and that translator does not exist here yet. One
+  inline ASM entity makes DXFIN discard the entire file, so `writeDxf`
+  keeps such REGION/3DSOLID/BODY entities out and says so in
+  `drawing.warnings`. Classic ACIS streams (R13–R2007 sources) travel
+  as always.
+- Pre-R13 table names are bound to CP1252 by the format itself; entity
+  text still travels losslessly through `\U+` escapes.
+- Real (non-nasjidwg) proxy payloads are preserved exactly as the source
+  release stored them and are not version-translated (only the owning
+  application's object enabler could do that). Records nasjidwg itself
+  seals travel across generations as proxies: one of the reference's own
+  classes under the version word of the filer that wrote the bits (the
+  reference unwraps it on open — see "Foreign-generation seals under
+  their own filer" below), any other class in this library's private
+  envelope, which returns native (A→B→A). An R13/R14 target has no
+  proxy record the reference keeps for either.
+- A sealed object goes out under its original owner whenever that owner
+  is in the file (see "Ownership-preserving passthrough" below) — every
+  owner now, layouts, views, the active viewport, dimension styles,
+  groups, the table controls, the root dictionary and its
+  sub-dictionaries included, each under its source number. What still
+  stays home says so: a class object of another generation that is not
+  the reference's and that one of its own tree dictionaries lists (the
+  reference audits a private envelope inside its dictionaries, so a
+  plain one is re-homed flat under the root, and a chained kind stays
+  out — the reference's own classes are listed natively now); a
+  DICTIONARYVAR is the model's own, `drawing.variables`, and goes
+  native into any generation; an XRECORD of another generation whose decode stopped
+  short (re-encoding needs every group); and, by default, the AcDbAssoc*
+  framework of an R2010 source into AC1032 and of an R2018 source into
+  AC1021 (opaque there). That family changed spelling at R2013, and the
+  respelling is now pinned and translated both ways (see "The
+  associative framework across the R2013 respelling" below) — but the
+  translated file, though bit-identical to the reference's own re-save
+  record for record, still draws silent AUDIT fixes from the reference
+  (the sample's dependencies that point into an unreferenced anonymous
+  representation block's network, which the reference re-targets on its
+  own save), so the native path is opt-in (`respellAssoc`) until that
+  is settled. The R2010/R2007 VISUALSTYLE set is the reference's
+  own standard set (16 in 2007, 19 in 2010, by name): it is dropped as
+  a set, reported once, and the reference recreates it on open.
+- DXF itself can only spell soft (330) and hard (340) references, so DWG
+  reference codes normalize to 4/3 after a DXF trip — a limit of DXF,
+  not of the DWG round trip.
+- Incremental (patch-in-place) save — rewriting a file in place rather
+  than rebuilding it — is still not built. `verbatimRecords` gets the
+  fidelity it was wanted for (untouched entities survive byte for byte);
+  what remains unbuilt is the in-place container patch that would also
+  save the rebuild cost on very large files.
+- **R2007 write.** AC1021 output opens in AutoCAD 2027 at AUDIT 0 errors
+  and is regression-gated like the rest, ACAD_TABLE included. The one
+  R2007 limit left is the format's own, not ours: an **ASM-dialect** ACIS
+  payload cannot travel inline in an AC1021 file, because that container's
+  kernel reads only the pre-ASM "ACIS BinaryFile" form (a genuine
+  ACIS-dialect blob written by this library into an AC1021 file opens at
+  AUDIT 0; the same file carrying an ASM stream is refused). An ASM
+  payload therefore leaves an R2007 target as SAT text, or is reported in
+  `skipped`.
+
+  What had blocked it for four campaigns was a wrong suspect. The header
+  field at record offset 0x100 that every earlier ledger called the
+  blocker — `random_seed` — turns out to carry no information about the
+  file at all: five different drawings saved to R2007 from five separate
+  AutoCAD launches carry the identical value, along with the identical
+  prologue key, check-data word and `crc_seed_encoded`. It is one draw of
+  a per-process RNG, and zero is accepted. The real defects were an empty
+  CLASSES payload (refused at AC1021 exactly as at AC1032), the inline
+  ACIS payload's bit-level start offset, and the cached wireframe block
+  that follows it — the last two hidden by a reader that probes for the
+  kernel magic instead of trusting the framing. The complete ledger,
+  including what `random_seed` is and the measurement that retired
+  13 650 digest combinations of searching for it, is in
+  `src/dwg/container2007.ts`.
+
+
+### Provenance
+
+Nothing in `src/` is copied out of a file another program produced.
+That rule is enforced by audit, not by assumption, and it has cost real
+work. Three violations were found and removed:
+
+- The **AcDs section** that carries an ACIS solid at R2013+ was first
+  implemented by patching a 13.5 KB template lifted from an AutoCAD save
+  — thumbnail bytes included. The template is gone: the section is now
+  emitted field by field from a grammar reverse-engineered and verified
+  by a parser that reads AutoCAD's own section back with no unexplained
+  bytes. It is 2.4 KB instead of 13.5, carries no image data at all, and
+  AutoCAD still audits it at zero errors.
+- The **3DSOLID record tail** at R2018 was 355 bits taken bit-verbatim
+  from a donor solid, including its revision id. Decoded against 28
+  purpose-generated records until every field was named — the id turned
+  out to be an ordinary RFC-4122 v4 UUID — it is now 163 bits this
+  library computes, with a per-body id derived from the payload itself.
+  Only two flags in that record are load-bearing (clearing either is
+  refused); every value behind them is ours.
+- The **20-byte run** after the R2004+ encrypted header is generated
+  from the LCG that produces it (the keystream is indexed by file
+  offset) rather than transcribed.
+
+Format constants — the section sentinels, the Reed-Solomon generator
+polynomial, Unicode and ACI tables — are structural markers and
+standards data, not the content of any particular drawing, and are not
+covered by this rule.
+
+Everything nasjidwg covers or intends to cover, capability by capability.
+Nothing is silently dropped — if it is not ✅ it is 🚧 (partial) or ⬜ (in
+the queue below).
+
+Legend: ✅ done & verified · 🚧 partial · ⬜ not started
+
+Verification rests on four independent mechanisms, none of which ships a
+drawing in this repository:
+
+1. **Self round-trip** — the suite generates every fixture with the
+   library's own writers and reads it back number-for-number.
+2. **Codec cross-check** — the DWG and DXF paths encode the same document
+   model independently and must agree with each other.
+3. **AutoCAD 2027 as the external oracle** — `tools/validate-external.mjs`
+   opens and AUDITs our output in the Core Console; all seven writable
+   release families are regression-gated on it, every one at zero AUDIT
+   errors.
+4. **A 317-file real-world corpus** (139 MB, 1982→2027: AutoCAD's sample
+   libraries, field drawings from real producers, vintage files) read as
+   an external oracle during development — no test depends on them.
+
+Earlier revisions of this file described a checked-in fixture corpus and
+an `oracle.test.ts`; both are gone. Nothing is shipped, nothing is
+downloaded, and `npm test` reproduces every fixture it asserts on.
+
+## Containers (file structure)
+
+| Capability | Status | Verified by |
+|---|---|---|
+| Version detect MC0.0/AC1.2..AC1032 (every published signature) | ✅ | unit tests |
+| R13/R14 read | ✅ | genuine AC1012/AC1014 drawings decode with zero failed objects, reconciled entity-for-entity against AutoCAD's own DXF export of the same file |
+| R2000 locator container | ✅ | real files + generated fixtures, zero failed objects |
+| R2004/2010/2013/2018 page container + LZ77 | ✅ | every AutoCAD sample-library drawing of these releases reads clean; counts match the DXF oracle |
+| R2007 RS container + its LZ77 | ✅ | 118 genuine AC1021 drawings read clean, counts match the DXF oracle |
+| Object map paging | ✅ | multi-page maps in real 3 MB field drawings |
+| CLASSES section, all layouts (R2000 / R2004 / R2007+ hsize+bitsize) | ✅ | class entities resolve in all 8 container versions (regression-tested) |
+| Header variables section parse (R13-R2018, all 3 stream layouts) | ✅ | EXTMIN/LIMITS/INSUNITS/CLAYER agree across all 8 container versions + reference DXF. The dimensioning sizes (DIMSCALE/DIMASZ/DIMTXT/DIMEXO/DIMEXE/DIMGAP/DIMDEC…) and the point glyph (PDMODE/PDSIZE) are kept, not just stepped over — cross-checked against the reference DXF export of the same drawing, over the whole corpus; a consumer without PDMODE draws point dots the file does not show |
+| Header date fields + drawing GUIDs | ✅ | TDCREATE/TDUPDATE/TDINDWG/TDUSRTIMER keep BOTH halves (`TDCREATE` is the Julian day, `TDCREATE_MS` the milliseconds into it — the day alone floors to midnight), and FINGERPRINTGUID/VERSIONGUID are captured rather than stepped over |
+| Header dimensioning variables (DIMSCALE, DIMASZ, DIMTXT, DIMEXO/EXE, DIMGAP, …) | ✅ | captured into `header.vars`, values verified against an independent decoder across the corpus; consumed by `explodeDimension`. R13/R14 store DIMDEC in an unconfirmed slot — deliberately not captured rather than guessed |
+| SummaryInfo + Preview (thumbnail) | ✅ | summary decodes from the section (R2004+) and from DWGPROPS before that; preview extracted as usable BMP/PNG on all 8 versions |
+| CRC verification (opt-in) | ✅ | readDwg(bytes, { checkCrc: true }); detects single-byte corruption |
+| Pre-R13 read (R1.1–R12) | ✅ | R1.4, R2.6, R2.10, R9, R10 and R11/R12 fixtures all decode; entity-for-entity and number-for-number against the reference exports |
+| Pre-R13 record chaining (JUMP across entity/block/extra runs) | ✅ | the R9/R10 fixtures park a polyline in the extras run and jump back for its vertices |
+| Pre-R13 drawing variables + fixed-record tables | ✅ | extents/limits/LTSCALE/CLAYER agree with the reference; LAYER, STYLE, LTYPE, BLOCK, VIEW, UCS, VPORT, APPID, DIMSTYLE |
+
+## DWG entities (read)
+
+| Entity | Status | Notes |
+|---|---|---|
+| LINE, POINT, CIRCLE, ARC, ELLIPSE | ✅ | oracle-verified geometry |
+| TEXT, ATTRIB/ATTDEF (as text), MTEXT | ✅ | R13/14 explicit form + R2000+ dataflags form. ATTRIB/ATTDEF carry their marker (`attribute`) and their 70-flags — bit 1 sets `invisible`, bit 2 `constant` — verified against a field drawing whose 150-unit invisible ATTDEFs used to paint as plain visible text. Justification (`halign` / `valign` / `alignmentPoint`) survives a rewrite, and `preserveHandles` keeps the attrib's own handle rather than minting a fresh one. Each of the four resolves the STYLE record it points at, so `style` names the font, width factor and slant the file asked for: the pointer used to be read and dropped, and a 72 MB drawing whose 59 styles mix TTF and SHX handed back all 1,652 of its text objects with no style at all |
+| LWPOLYLINE (bulges, widths, ids) | ✅ | the R2010+ vertex identifiers (DXF 91) are read into `PolylineVertex.id` and written back (flag 0x400), plinegen (`plineGen`) too; the reference's DXF of a rewrite shows the same 91 values |
+| POLYLINE_2D/3D + vertex folding | ✅ | chain (≤R2000) and owned (R2004+) forms. A heavy polyline stays one: `heavy: '2d' \| '3d'`, a 3D polyline's vertices keep their `z`, a spline-fit one keeps its frame (VERTEX 70 = 16) apart from the fitted curve it draws (`fit`, `frame`), a curve-fit one marks the inserted vertices (`curveFit`, `tangent`); the header's own colour/weight/EED land on the entity. Written back as POLYLINE + VERTEX + SEQEND in DWG and DXF — the reference's census of the sheet-set samples (33 + 22 + 1 heavy polylines) matches and the rewrites audit clean |
+| POLYLINE_MESH / POLYLINE_PFACE + faces | ✅ | mesh entity; 1–2 index faces kept |
+| INSERT / MINSERT + attribs | ✅ | |
+| SPLINE (both scenarios) | ✅ | fit-point + control-point forms |
+| SOLID/TRACE, RAY/XLINE, 3DFACE, SHAPE | ✅ | |
+| DIMENSION ×7 + ARC_DIMENSION | ✅ | all kinds, full point sets, oracle-verified |
+| HATCH | ✅ | exact edge paths, polyline paths w/ bulges, deflines, seeds, gradient (R2004+). Associativity and the generating-entity handles (DXF 330) survive a rewrite when those handles remap; the writer rebuilds the reactor on each boundary — AutoCAD 2027 AUDIT reports "Boundary Missing a Reactor — Remove Associativity" without it. Associative-with-no-boundary is never written |
+| MLINE, TOLERANCE, LEADER (full), VIEWPORT | ✅ | |
+| IMAGE / WIPEOUT (+IMAGEDEF path) | ✅ | clip (an open ring — the DXF reader drops the closing duplicate so both codecs agree), the R2010+ inverted-clip bit, brightness/contrast/fade |
+| REGION / 3DSOLID / BODY (ACIS) | ✅ SAT (v1) inline, SAB (v2) inline, and R2013+ payloads from the AcDs section — all 6 containers verified; `acisWires` turns the payload into the wireframe curves AutoCAD draws it with |
+| LIGHT | ✅ | name, type, position/target, intensity, colour |
+| MULTILEADER | ✅ | leader lines, dogleg, landing, text or block content, and a block note's attribute values (`attributes`: ATTDEF handle + tag, index, width, text) — the close of the common data was bit-walked to the last bit against the reference's saves of its multileader sample at 2000, 2004, 2007, 2010, 2013 and 2018 (R2010+ has no arrowhead list before the labels). Written in every container: the reference opens the rewritten 21-multileader sample at AUDIT 0 in all four and its own R2000 DXFOUT of our files carries the 330/177/44/302 label groups |
+| ACAD_TABLE (all containers) | ✅ | full grid, widths/heights, placement and cell text; the R2010+ linked-table structure decodes to the same table as the pre-2010 record, verified across four containers of one drawing. The R13/R14 head is the INSERT head of that release — three explicit BD scales, not the R2000 data flag (bit-walked on the reference's R14 save of A-01; read with the flag form its table had an extrusion of −1.29e156 and a negative column count, and the R14 rewrite audited "Invalid number in object's normal vector" — now AUDIT 0, ACAD_TABLE = 1 in its DXFOUT). Per-cell formatting on both grammars (`TableCell`): text style, text height, alignment, text colour, fill colour + fill switch, rotation, per-edge colour / lineweight / visibility, merged and autofit flags, block cells with their attribute values; table-level title/header suppression, flow direction and cell margins (`TableEntity`). Pinned bit-for-bit on the reference's own tables — the pre-2010 override groups on its 2000/2004/2007 saves of A-03 and Text-and-Tables, the R2010+ cell style, content format and table-level style + merge list on its 2018 saves (which also fixed the R2010+ tail: a table-level cell style precedes the merges, so a 2018 schedule's spans now decode), and the colour/height/rotation bits on its 2018 conversion of a fixture carrying every override at once. Written back in every container and proven the same way: every override kind opens at AUDIT 0 at 2000/2004/2007/2018, and the reference's R2000 DXFOUT of A-03, Text-and-Tables and A-01 rewritten by this library matches its DXFOUT of the originals cell for cell (the few residual differences are its own normalizations: empty block cells re-typed as text, a height override dropped from a covered cell, autofit re-derived). One reference quirk, recorded rather than worked around: from a pre-2010 record it re-exports the title-suppressed flag and the margins but not the header flag or the flow direction, although the bits are the ones its own 2000 saves carry; from the R2010+ record (where suppression is a missing row style) it re-exports all of them. Not carried: per-cell margins (R2010+ only), the table-level border overrides, and R2010+ autofit |
+| OLE2FRAME / OLEFRAME | ✅ | frame corners, link/embed/static type, tile mode, aspect lock, and the embedded document kept byte for byte |
+| MESH (subdivision surface) | ✅ | control mesh, face list, creases; agrees with the reference export vertex-for-vertex |
+| PLANE/EXTRUDED/LOFTED/REVOLVED/SWEPT/NURB SURFACE | ✅ | retained as ACIS with their kernel payload and surface flavour |
+| POINTCLOUD / POINTCLOUDEX | 🚧 | placement, extents, scan file name and point count decode; written from the format description because no drawing in the corpus carries a scan, so it is not fixture-verified |
+| Proxy graphics decode | ✅ | the cached display list becomes real entities (circles, arcs, polylines, meshes, text, rays), so entities we cannot model still draw |
+
+Unknown ≠ lost: common data (layer, color, linetype, handle) is decoded and
+the entity is retained with its source type name — verified per version.
+
+## DWG objects (read)
+
+| Object | Status |
+|---|---|
+| LAYER / LTYPE / STYLE (full) | ✅ |
+| BLOCK_HEADER / BLOCK_CONTROL | ✅ | anonymous blocks (*D, *U, …) are stored under one bare stem name each — numbered off their unique handles at read time so every definition survives and each dimension keeps its own. External references read into `BlockDefinition.xref` (path, overlay) and are **written back as real attachments** from R2000 on — xref/overlay bits, path, insert list, no owned entities, and the `xref\|name` layers, linetypes and text styles the attachment lends the drawing travel with it, flagged dependent with its block handle (the form the reference's own 2000/2004/2018 saves take); the reference reopens the rewritten A-01 sheet with both attachments resolved (BLOCK 70=36 / 70=44, path intact) at AUDIT 0 in 2018, 2007, 2004 and 2000, and with the referenced files absent it opens unresolved as it does its own. R13/R14 keep an attachment as a plain block and report its dependent records in `skipped` |
+| IMAGEDEF (file path, resolved onto images) | ✅ |
+| DICTIONARY / LAYOUT / GROUP / MLINESTYLE / DICTIONARYVAR | ✅ layouts (name, tab order, block, limits, extents), groups (members), mline styles (elements with colours and linetypes — a handle from R2018, the linetype table's entry index before; an MLINE's `styleName` is its ACAD_MLINESTYLE key), the variable dictionary's DICTIONARYVARs into `drawing.variables` (name, value, schema) |
+| TABLESTYLE / MLEADERSTYLE | ✅ decoded into `drawing.tableStyles` / `drawing.mleaderStyles` (named by their ACAD_TABLESTYLE / ACAD_MLEADERSTYLE entries) and every ACAD_TABLE and MULTILEADER names its own through `styleName`. A table style carries its description, flow direction, flags, margins, title/header suppression and the data, title and header cell styles — text style and height, alignment, text and fill colour, fill switch, the six borders (lineweight, visibility, colour) and the R2007+ value type and format; a multileader style the content type, draw orders, leader type, colour, linetype, lineweight, landing and dogleg, arrowhead block and size, text style, angle, alignment, colour, height, frame, block, scale, break size and the R2010+ attachments. Both DWG generations of TABLESTYLE are read — the row-style record through R2007 (its colours in the 2004 CMC layout in every release, R2000 included) and the R2010+ cell-style map (id 101 "Table" with the margins and the flow-direction override, then _TITLE / _HEADER / _DATA, whose border word counts invisibility) — walked bit-exact against the reference's 2000, 2004, 2007, 2010, 2013 and 2018 saves of three of its own drawings; MLEADERSTYLE the same across 2000 … 2018. A record that does not walk to its data end is sealed as before |
+| APPID / DIMSTYLE / VPORT / VIEW / UCS | ✅ names + geometry; APPID resolves xdata owners, DIMSTYLE resolves dimension.style. The whole VIEW record from R13 to R2018 — target then direction (the earlier walk had them swapped and read the twist as the lens length), twist, lens, clips, view mode, render mode, the paper-space flag and the R2000+ associated UCS — graded field for field against the reference's own DXF of all 238 named views in its sample library. Every layout, view, viewport, dimension style, group, mline style, table style and multileader style carries its `handle` and, when it has one, its `xdict`; `drawing.structureHandles` names the root dictionary, its modeled sub-dictionaries and the table controls |
+| Saved view: VIEWTWIST + the viewport UCS | ✅ the whole VPORT record — twist, target/direction, lens, clipping, view mode, circle sides, UCSICON, snap and grid, and the R2000+ per-viewport UCS — read, written and carried through DXF. Graded field for field against AutoCAD's own DXFOUT: **36 of 36 on nine drawings** across R14/R2000/R2007/R2018, including three saved with UCSICON 3, 1 and 0 and one with DVIEW front clipping. A drawing laid out at an angle draws square only if VIEWTWIST survives, and `viewTwistTransform` hands a consumer the 2D transform that squares it |
+| Header UCS (UCSORG / UCSXDIR / UCSYDIR) | ✅ captured into `header.ucs` (and `header.pUcs`), written back by every DWG writer and by the DXF writer as $UCSORG/$UCSXDIR/$UCSYDIR; `ucsTransform` turns it into a basis. Before R2000 this is the only place a rotated layout is recorded |
+| XRECORD retention (typed values, dictionary names) | ✅ DWG + DXF both ways — and under its owner: the DXF reader seals each XRECORD beside its values (`ownerHandle`, reactors, `dictPath` when the tree lists it) with its DWG bits in the R2007 spelling whatever the source's version (a seal with no bits went out as an empty record — refused by the reference for every XRECORD of an AC1015 source), so the DWG writers carry a DXF-read record natively under its dictionary — whole into an R2007+ file, re-encoded from the values in the target's spelling into an older one (A-01 → our DXF → readDxf → 2000/2007/2018 DWG: AUDIT 0). One typing table for both codecs (`resbufKind`): group 5 (and 105) is a counted STRING in the run, not an object id — the reference's own data-extraction records (ACAD_DXFILE: codes 1, 4, 2, 3, 5) carry an empty one, and spelled as an 8-byte id it made the 2018 file refuse to open (its DXF of the Data Extraction sample → 2018 DWG now AUDIT 0). The DXF writer writes a DWG-read record from its values under its owner, and only the root's own and a caller's under the named objects dictionary |
+| SORTENTSTABLE (draw order) | ✅ applied, not just parsed: each table reorders its space's entity array in place by ascending sort key (an entity no entry names sorts under its own handle), so the array a consumer draws IS the draw order — DWG and DXF readers agree. Verified pair-for-pair against AutoCAD's own DXF of a 193,382-entry model-space table (518 tables in that drawing; the 507 empty ones skip). The DXF spelling hides a trap: the object's own handle is a group 5 that sits BEFORE the AcDbSortentsTable marker, and only the 331/5 pairs after it are entries |
+| Dynamic-block visibility (states + members) | ✅ | blocks flagged dynamic; every state named in definition order with the entities it shows — 48 states verified |
+| Dynamic-block parameters + actions | ✅ linear/rotation/flip/alignment/base-point parameters with names, labels, descriptions, points and value sets ("Door Size" [24,28,32,36,40] decodes from the fixture), plus the action kinds (move/stretch/scale/flip/rotate/…) |
+| Remaining dynamic-block records (lookup tables, constraint parameters, grips) | 🚧 retained as objects; they carry no geometry of their own |
+| PDF/DGN/DWF underlays + definitions | ✅ read and write, DWG and DXF both; verified against a reference DWG/DXF pair |
+| EED/XDATA retention (entities, app-resolved) | ✅ | read and written (R13–R2018). The writer encodes the DXF 1000-range, mints an APPID record for every named application, and remaps 1005/1003 through the file's own handles. A 72 MB field drawing's insert/line/dimension XDATA — including two ACAD DSTYLE overrides — used to vanish with no warning |
+| GEODATA (geographic placement) | ✅ DWG (all three version forms) + DXF read, DXF write, GeoRSS lat/long parsed — DWG and DXF readers agree field-for-field on the reference pair |
+
+## DWG write
+
+| Capability | Status |
+|---|---|
+| R2000 container + objects | ✅ full file structure (locators+CRCs, header vars, object map, 2nd header, aux/objfree/template/preview) |
+| R2004 (AC1018) page container | ✅ page/section maps, LZ77 system pages, encrypted file header |
+| R2018 (AC1032) container | ✅ same page container + R2010+ object framing (BOT type, handle-size prefix) and R2007+ string streams |
+| Header variables write | ✅ every container generation. R2007+ splits the section into data/handle/string streams exactly as it splits objects (bitsize field, UTF-16 tail) and adds its own fields (CMATERIAL, DIMFXL/DIMARCSYM/DIMFXLON, R2010 DIMTXTDIRECTION, R2013 REQUIREDVERSIONS); written R2000-style the section did not parse at all and every variable in an R2007/2018 file was lost |
+| R2007 (AC1021) write | ✅ the Reed-Solomon page container, its LZ77 dialect, all three header checksums, the R2007 object framing and the inline ACAD_TABLE grid; **externally gated at AUDIT 0 errors** in AutoCAD 2027 with the full corpus. One limit, reported in `skipped`: an ASM-dialect ACIS payload, which AC1021's kernel cannot read inline — a genuine ACIS-dialect blob written by this library opens clean |
+| Page compression (R2004/R2007/R2010+) | ✅ real greedy hash-chain LZ77 matchers for both dialects, self-verified: every compressed page decodes byte-for-byte through the library's own oracle-tested decompressors, plus a structured fuzz sweep. The corpus containers shrank 37-43% (R2004 6624→3776, R2007 9600→6016, R2018 7712→4384 bytes) |
+| Pre-R13 write (R12 / AC1009) | ✅ `writeDwgR12`: fixed 205-variable header block, split table directory (five entries up front, five embedded at fixed offsets), per-record CRCs, all 14 section sentinels, second header — every pre-R13 fixture (R1.4→R12) survives a rewrite number-for-number |
+| Pre-R12 write (R10 / R9 / R2.6 / R2.10) | ✅ `writeDwgR10/R9/R2_6/R2_10`: per-release header-variable blocks (761/741/506-byte layouts), leading-run table directory, one-byte linetype refs, 2D bodies with shared elevation before R10 (3DLINE/3DFACE as the exact-3D escape hatches), per-record CRCs — each verified by round trip through the pre-R13 reader, number-for-number. What a release cannot hold is downgraded to visible geometry or reported, never dropped silently |
+| R13/R14 header variables | ✅ written in the AC1012/AC1014 field order (own dimension-flag block, inline DIMPOST…DIMBLK2 texts, no R2000+ blocks), mirrored field-for-field from the reader — extents, limits, LTSCALE and the dimensioning sizes round-trip through both releases |
+| The variable dictionary (AcDbVariableDictionary → DICTIONARYVAR) | ✅ read into `drawing.variables` (name, value, schema, handle, xdict — DIMASSOC, DIMADEC, SORTENTS, CTABLESTYLE, CMLEADERSTYLE, CANNOSCALE, LIGHTINGUNITS, CVIEWDETAILSTYLE…) and written natively by every R2000+ writer under a rebuilt `ACDBVARIABLEDICTIONARY` (the reference's own spelling of the key), each record the schema byte and the value text — NUL-closed in the codepage containers, the dictionary as owner *and* persistent reactor, the shapes bit-walked off the reference's 2004/2007/2018 saves of A-01 (without the reactor the R2007+ files read the defaults back). A header slot the target release lacks joins the dictionary the way the reference's saves spell it — read off its 2000/2004/2007 saves of A-01 (R2007) and of Structural - Metric (R2018): DIMASSOC, INDEXCTL, XCLIPFRAME and SORTENTS before 2004; SOLIDHIST before 2007, and PSOLWIDTH/PSOLHEIGHT before 2007 only when they are not its defaults (A-01's 0.25/4 stay out of its 2004 save, Structural - Metric's 5/80 go in, spelled "5.000000") — and a slot this release has takes the dictionary's value when the source header carried none (a 2000 file's DIMASSOC into 2004+). From 2007 the reference writes LAYEREVAL and LAYERNOTIFY into every save (1 and 15 when the source had none — its 2007 save of A-01 lists eleven entries: the seven, the two view-style names it creates, and these two; its 2004 save neither), so a 2007+ file of ours carries them too; that is why an A-01 written as 2007 used to list three DICTIONARYVARs fewer than the 2004 leg in its DXFOUT (SOLIDHIST rightly back in the header, LAYEREVAL/LAYERNOTIFY missing). A DICTIONARYVAR that arrived through DXF as tags is rebuilt from them. Under `preserveHandles` the dictionary and its records keep their numbers. R13/R14 have no such dictionary: reported once in `skipped`. Proven on the reference: A-01 written as 2018/2007/2004/2000, both handle modes — AUDIT 0, `(dictsearch (namedobjdict) "AcDbVariableDictionary")` lists the source's seven entries (SOLIDHIST joining at 2004, DIMASSOC/INDEXCTL/XCLIPFRAME/SOLIDHIST at 2000), `(getvar)` of DIMASSOC 1, SORTENTS 127, CTABLESTYLE, CMLEADERSTYLE, CANNOSCALE 1:1, DIMADEC 0, SOLIDHIST 1 as the source; a synthetic drawing's PSOLHEIGHT/LIGHTINGUNITS/CANNOSCALE round-trip through the reference's own re-saves of our 2018 file into 2000/2004/2007 |
+| MLINESTYLE beyond STANDARD | ✅ every `drawing.mlineStyles` record written in every release R13→R2018 (name, description, flags, fill colour, cap angles, the elements' offsets, colours — 2004 CMC where the container uses it — and linetypes: a table index through R2013 — 32767 BYLAYER, 32766 BYBLOCK, else the record's position in the linetype table's entry list — and a handle per element from R2018), STANDARD synthesized only when the drawing has none, one record per name; every MLINE points at the record its `styleName` names (else STANDARD) and the header's CMLSTYLE at `header.vars.CMLSTYLE`. The reader resolves an MLINE's style to its ACAD_MLINESTYLE key, a pre-2018 element's linetype through the LTYPE control's entry list and the header's CMLSTYLE to a name. Pinned bit for bit on the reference's own 2000/2004 re-saves of a synthetic WALL style (four elements, DASHED/HIDDEN/ByBlock/ByLayer): identical data streams save the NUL that closes the 2000/2004 name and description (now written) and the nearest-ACI choice for a true colour at 2000. Proven on the reference in 2018/2007/2004/2000/R14: AUDIT 0, `ACAD_MLINESTYLE` lists STANDARD and WALL, the MLINE's `340` names its style, `(getvar "CMLSTYLE")` = WALL, and the reference's re-saves read back with the same elements |
+| UCS table records | ✅ `drawing.ucs` written in every release R13→R2018 — name, origin, axes, and from R2000 the elevation (146), the orthographic view type (79), the remembered origin per orthographic type (71/13 pairs) and, in the handle stream after the xref slot, the base UCS (346) and the always-null second pointer, bit-walked on the reference's 2000/2004/2007/2018 saves of its Tower sample (`BD 0, BS 0, BS 0` closing the data, `4:control 5:0 5:0 5:0` the handles); the reader decodes the same fields (`elevation`, `orthoViewType`, `orthoOrigins`, `baseUcs` by name, `handle`, `xdict`). The header's UCSNAME / PUCSNAME point at the record `header.vars.UCSNAME` / `PUCSNAME` names (the reader resolves them to names, as the DXF spells them). Proven on the reference: Tower (ZX, ZY) and a variant it saved with ZX current, written as 2018/2007/2004/2000/R14 — AUDIT 0, `(tblnext "UCS" T)` lists both records with 79/146, `(getvar "UCSNAME")` = ZX with UCSXDIR (0 0 1) |
+| MTEXT round-trip records (ACAD_MTEXT_2008_RT / ACAD_MTEXT_RT) | ✅ the 2008 paragraph codes (`\px…;`) go out natively in AC1032 alone — the reference's own saves of such a text into 2013, 2010, 2007 and 2004 all carry the 2004 spelling and its 2000/R14 saves no `\p…;` at all (measured) — so every writer below R2018 rewrites the text that way and keeps the original in the entity's extension dictionary as the reference does: `ACAD_MTEXT_2008_RT` = (40 = Σ charCode(i)·(i+1) over the 2004 spelling, 1 = the original in 250-character pieces), and for 2000/R14 `ACAD_MTEXT_RT` = (40 = the same sum over the text as written, 1 = the 2004 spelling) — the sums pinned on the reference's saves of three probe texts and of its Text-and-Tables sample, the dictionary (hard-owner, as the reference's) the records' owner and reactor. Every such MTEXT is listed in the ACDB_RECOMPOSE_DATA record beside the column parents and tables — the reference's own 2000/2004/2007/R14 saves list them, and it is the listing that makes it take the original back on open (from a file without it the 2004 spelling came back alone, measured). A source chain travelling sealed under the entity is kept (its sums hold), one that does not travel is rebuilt from the source's typed values, and a fresh extension dictionary is built for an entity that had none. Proven on the reference: the Text-and-Tables sample (2004-spelled MTEXTs with the reference's own 2008_RT beside them) written as 2007/2004/2000/R14 in both handle modes — AUDIT 0, `(entget)` shows the `360` dictionary, and the reference's SAVEAS 2018 of each of our files restores the `\pxql,t2;…` original (our reader shows it); a 2018 probe with three `\px` texts written as 2007 and 2004 restores the same way |
+| Proxy passthrough (entities + objects) | ✅ ACAD_PROXY_ENTITY (0x1F2) and ACAD_PROXY_OBJECT (0x1F3) survive a round trip in every container R13→R2018: application payload bit-for-bit (the stream is not byte-aligned), cached display list byte-for-byte (and still decoded to drawable primitives), handle references code-for-code, and the original application class re-emitted in CLASSES with its app name. Dictionary-owned proxy objects keep their NOD entry names |
+| Universal sealed passthrough | ✅ every record the semantic layer cannot model — an unknown application class, a dictionary object with no decoder, or a KNOWN type whose decode fails — rewinds and is retained SEALED: payload bit-exact, R2007+ string stream verbatim, handle references code-for-code, cached display list byte-for-byte. Re-emitted natively when the target shares the payload's encoding generation (14 / 2000 / 2004 / 2007 / 2018). Ignorance downgrades the view, never the file |
+| Cross-generation transport (A→B→A) | ✅ sealed bits from generation A travel through a foreign generation B wrapped in a proxy record — the format's own idiom for data the host release cannot hold — tagged with their generation, and unwrap back to the native record on returning to A. Verified including a 2018→R13→2004→2018 odyssey with a non-byte-aligned payload and a string stream |
+| Handle-stable rewrite (`preserveHandles`) | ✅ every writer accepts `{ preserveHandles: true }`: entities and retained objects keep their source numbering, fresh structural handles are allocated above it, and the object map is emitted sorted. Sealed records reference each other by handle, so with the numbering stable those references stay valid across any number of rewrites without the library understanding them |
+| Ownership-preserving passthrough | ✅ a sealed object is written under its ORIGINAL owner whenever that owner is in the file — an entity, a block header (the two space blocks through their layouts' `blockHandle`), a layer/linetype/style record, a proxy object, another sealed object, or a sealed dictionary — and only a record whose owner is not written is re-homed under the named objects dictionary as before. The reader keeps every extension dictionary (`Entity.xdict`, `BlockDefinition.xdict`, `Layer/Linetype/TextStyle.xdict`) and every sub-dictionary of the named-object tree sealed with its `entries` decoded, the XRECORDs they list bit-exact, persistent `reactors` on objects and entities, and the nodes of a dynamic block's evaluation graph beside their decoded view; the writers re-encode a dictionary from its entries (an entry whose target is not written is left out, the writer's own draw-order table or rebuilt graph joins the rest), write each entity's/record's xdict pointer only when that dictionary goes out under it, and settle what travels to a fixed point (an owner that stays home strands its chain; a hard reference into nothing keeps the record home; a dictionary with nothing written to list is dropped quietly). Under `preserveHandles` the chains the reference checks survive as the source spelled them — an entity's `ACAD_FIELD` → FIELD (the drawing's FIELDLIST beside them in the NOD), an INSERT's `ACAD_FILTER` → SPATIAL_FILTER, a block record's `ACAD_ENHANCEDBLOCK` → evaluation graph → every parameter/action/grip node (a genuine block's whole graph travels; the visibility rebuild is for library-authored blocks only), `ACAD_ASSOCNETWORK` → network → constraint groups → dependencies (hung on their entities as reactors), `ACAD_VISUALSTYLE`/`ACAD_SCALELIST`/`ACAD_MATERIAL`/... → their records — proven on the reference: A-01/A-03 (fields, the "Drawing Title" graph: DXFOUT lists BLOCKLINEARPARAMETER/BLOCKLINEARGRIP/BLOCKSTRETCHACTION under the block), Mechanical - Xref, Site Grading Plan (SPATIAL_FILTER), Data Extraction (DATALINK/TABLEGEOMETRY), Floor Plan Sample, Structural/Mechanical - Metric (ASSOC networks, R2018 sources), all at AUDIT 0. Without `preserveHandles` the handle stream is remapped and the same chains are kept for the kinds whose data names no handles; XRECORDs, the AcDbAssoc* framework and the dynamic-block family stay home there and say so |
+| Every owner keeps its number | ✅ the owners the writers used to rebuild with fresh handles keep their source numbers under `preserveHandles` — the LAYOUT objects, the named views (now written: VIEW records in every release, R14 to R2018), the active VPORT, the DIMSTYLE records, the GROUPs (now written, listed under ACAD_GROUP with the members that are in the file), the TABLESTYLE / MLEADERSTYLE records, the symbol-table controls, the root dictionary and the sub-dictionaries the writer builds (`drawing.structureHandles`) — so a sealed extension dictionary hanging off any of them goes out under it with its pointer written: the layer table's ACAD_LAYERFILTERS / ACAD_LAYERSTATES / ACLYDICTIONARY chain, a layout's thumbnail record, a view's `ADSK_XREC_VTRTHUMBNAIL`, a table style's `ACAD_ROUNDTRIP_2008_TABLESTYLE_CELLSTYLEMAP`. Proven on the reference (A-01 into 2018, VW252-02-0500-N with its eight paper-space views, a synthetic drawing with two groups and two views in R14/2000/2004/2007/2018): AUDIT 0, `(tblnext "VIEW")` and `(dictsearch (namedobjdict) "ACAD_GROUP")` returning the records value for value, the layer table's 360 chain resolving |
+| Tree dictionaries across generations | ✅ a dictionary of the named-objects tree is re-encoded from its entries in every generation (its grammar is fixed), and an XRECORD it lists from its typed values (a byte-counted run of (group, value); only the string spelling moves — a counted codepage-30 byte run through R2004, UTF-16 from R2007 — proven on the reference's own R14/2000/2004 re-saves and its 2007 originals), trusted only when the decoded run accounts for every byte the record declared. A class object of another generation that such a dictionary lists stays listed when it is one of the reference's own classes (it leaves under its own filer, below); one of any other class is never listed inside it (the reference audits a private seal-wrap inside one of its own dictionaries): re-homed flat under the root, a chained kind staying home and saying so. A-01 (2007) into 2018 dropped from 28 skipped lines to one |
+| Foreign-generation seals under their own filer | ✅ a sealed record whose bits belong to another encoding generation leaves as a proxy record whose version word names the filer that wrote the bits (23 R2000, 25 R2004, 27 R2007, 29/31/33 the R2010 family — the source file's own release when the bits are its generation's), DWG format, the payload the record's data area as that filer laid it out. The head is spelled as the reference spells its own (bit-walked on its 2000, 2004, 2007 and 2018 saves of one probe): the class id, in the R2004 family alone a NUL-closed `cn:<class>` text before the version word, the R2018 maintenance word, the from-DXF flag; R2007+ keep `cn:` first in the record's string stream. An R2007+ payload's strings ride that stream behind `cn:` in an R2007+ file and close the payload — stream, size word, flag — in a pre-2007 one, both the reference's own spellings (its 2018 and 2004 re-saves of an R2007-filer proxy carrying a string). The reference unwraps such a proxy of its own classes into the record on open, so it is listed by its dictionary and owned by its owner like a native record; the private SEAL_MAGIC envelope is kept for classes that are not the reference's (any application name other than `ObjectDBX Classes`, `ISM`, `WipeOut`, `ACDB_*_CLASS`), which it could only keep as unknown proxies. R2004 targets now carry the reference's classes this way (they stayed home before); R13/R14 have no proxy record the reference keeps. The reader re-seals a proxy of a named class under a foreign filer code back into that generation (from either spelling of the strings), so a further rewrite is a fixed point. Proven on the reference: A-01 (R2007) into 2018 and 2004, Structural - Metric (R2018) into 2004 — AUDIT 0, census = original, FIELDs, SCALEs, MATERIALs, the evaluation graph and the ASSOC networks native in its DXFOUT, `skipped` 157 → 1 (A-01 into 2004) and 355 → 1 (Structural - Metric into 2004), second generation = first. One family stays in the private envelope for an R2007 target: the associative framework (AcDbAssoc*, the dependency bodies) — unwrapped from the filer-tagged form there the reference repairs the drawing on open (24 silent AUDIT fixes on Structural - Metric, six of its fourteen constraint parameters erased with them; with the family alone opaque, measured on four patched variants, the evaluation graphs and every constraint parameter stay native at AUDIT 0 — Structural - Metric/Imperial, Civil - Metric, Architectural - Metric into 2007, second generation = first; the same records unwrap clean in a 2004 file). The family's R2013 respelling is now pinned and translated (see "The associative framework across the R2013 respelling"); what the reference still fixes in a natively spelled 2007 file is described there |
+| DXF-born records as DXF-format proxies | ✅ a record that arrived through DXF as tags alone (a FIELD, a SPATIAL_FILTER, an ASSOC network from the reference's own DXF) leaves a DWG as a proxy in DXF format — the reference's own spelling for an object whose class it cannot load, decoded from its 2000/2004/2018 saves: version = the DXF's release code, maintenance 0x7FFFFFFE (0x7FFF in the pre-2018 high half), from-DXF 1, payload `BL 499` (498 for an entity), `BL` the record's class number, then one `(BS code, value)` pair per group — real BD, point three BD (the y/z groups folded into their x), 16-/8-bit integer BS, 32-bit BL, byte run BL n + bytes, text TV (inline NUL-closed before R2007, in the string stream behind `cn:` from it), handle in the handle stream (330 → 4, 340 → 5, 350 → 2, 360 → 3) — closed by `BS 0`; the common section (handle, fences, owner, an entity's whole AcDbEntity block, extended data) is the prologue's. The reference opens such a proxy of its own classes as the record itself, under its owner, listed by its dictionary. Proven: the reference's DXFs of A-01, Site Grading Plan and Structural - Metric through `readDxf` into 2018 — AUDIT 0, census = original, its DXFOUT lists FIELD 102 / 82, SPATIAL_FILTER 2, SCALE 33, VISUALSTYLE 26, MATERIAL 3, the evaluation graph and the ASSOC networks (80 geometry dependencies, 38 variables) natively, `skipped` 187 → 3, 156 → 7, 343 → 3; the reader keeps the proxy whole (record, string stream, reactors, extension dictionary), so a second generation is a fixed point. A DXF-born ACDBSECTIONVIEWSTYLE / ACDBDETAILVIEWSTYLE travels too, but flat under the root under its own name, never listed by ACAD_SECTIONVIEWSTYLE / ACAD_DETAILVIEWSTYLE and without its reactor on that dictionary — the reference type-checks the entries of those two dictionaries BEFORE its lazy unwrap (measured on A-01's DXF: listed, the entry is deleted "Imperial24 eNotThatKindOfClass, Delete Entry", AUDIT 1 fix; flat, AUDIT 0 and its DXFOUT lists the style as a native ACDBSECTIONVIEWSTYLE beside the default it creates). Proven: A-01's reference DXF into 2018 — AUDIT 0, census = original, DXFOUT ACDBSECTIONVIEWSTYLE 2 / ACDBDETAILVIEWSTYLE 2 (Imperial24 + Metric50 each), nothing of the styles in `skipped`, second generation the same. R13/R14 have no proxy record for it |
+| The space block headers keep their numbers | ✅ under `preserveHandles` the *Model_Space and current paper-space block headers take their source handles — the layouts' `blockHandle`, or the reader's `structureHandles.MODEL_SPACE` / `PAPER_SPACE` where a file carries no LAYOUT objects (an R13/R14 file of this library's own) — so a block header's extension dictionary (the reference's `ACAD_LAYOUTSELFREF` chain of its R14 saves) travels on every generation; without the option the source numbers still map to the headers written. Proven: A-01 into R14 and the reference's own R14 save of A-01 into R14, each read and written again — the same sealed counts at both generations, nothing skipped at the second, AUDIT 0 both, DXFOUT identical |
+| CLASSES version pairs | ✅ a class-based record's `appClass` carries the version pair its CLASSES record had (`dwgVersion`, `maintVersion` — constants per class in the reference's files: 28/1 for its constraint parameters, 27/45 for the associative network, 25/55 for the evaluation graph, the same in every release it saves to), and the writers emit the pair with the class instead of the R2004 code for every class |
+| Plot style name dictionary | ✅ the source's ACDBDICTIONARYWDFLT travels with its default, the ACDBPLACEHOLDER (an empty body under fixed type 80, retained sealed now), re-encoded from its entries with the default closing the handle stream; the header's PLOTSTYLE pointer names it. `(dictsearch (namedobjdict) "ACAD_PLOTSTYLENAME")` on the reference returns the dictionary under its source handle with `Normal` → the placeholder, AUDIT 0 |
+| One CLASSES record per class name | ✅ a single registry numbers every class the file names, in the order they are registered: the writer's own classes, the application classes behind proxies and sealed objects, the rebuilt visibility graph's nodes, the draw-order table — a genuine dynamic block's sealed nodes beside a library-authored visibility block share the numbers. Proven on the reference: the Structural - Metric sample plus a synthetic DOOR block, written as 2018 — AUDIT 0, its DXFOUT lists every graph node under both blocks, 35 CLASSES records with 35 distinct names |
+| The associative framework across the R2013 respelling | ✅ pinned on the reference's own re-saves, record for record under the same handle (an R2018 original — Structural - Metric — against its 2007/2010/2013/2018 saves; three R2010 originals — Civil - Metric, Architectural - Metric, Structural - Imperial — against theirs): the reference keeps the AcDbAssoc* family natively in every release, in one spelling through R2010 (its 2007 and 2010 saves are bit-identical) and another from R2013 (2013 = 2018). What changed: AcDbAssocAction's class version 1 → 2, version 2 closing the base with `BS 0, BL owned parameters, BS 0, BL value parameters` (zeros in every record measured) — the base of ACDBASSOCNETWORK, ACDBASSOCVARIABLE and ACDBASSOC2DCONSTRAINTGROUP; the geometry dependency's persistent sub-entity id class as a text before R2013 (`AcDbAssocSingleEdgePersSubentId`, `AcDbAssocEdgePersSubentId`, in the record's string stream) and as `B 0, BL code` from it (1 and 3), the id's own fields the same; the 2D constraint group's node list — `T class, BL id, RC status, BL n, n×BL, body` per node before R2013, and from it `BL 0, BL 0, B 0`, a table of the distinct class names (`BL count`, the names in the string stream by first use), `BL nodes`, one `B 0, BL name index, BL id` per node, then every node as `BL id, BL n, n×BL, RC status, body`, a circle's or arc's fourth real appearing (zero); the node bodies otherwise the same, their grammar pinned by the reference's DXF of the four samples (19 node classes); ACDBASSOCDEPENDENCY, ACDBASSOCVALUEDEPENDENCY, ASSOCDIMDEPENDENCYBODY and BLOCKPARAMDEPENDENCYBODY bit-identical. The CLASSES version pair names the spelling to the reference, not the file's release: the four dependency classes are 27/50 in its 2007/2010 saves and 27/175 from 2013. `src/dwg/assoc.ts` translates every kind both ways by copying the untouched spans verbatim (nodes re-listed in ascending id order, the order of the reference's own saves) and refuses anything it does not know (an unknown node class, a non-zero field the other spelling cannot hold, a walk that misses the last bit); against the reference's own saves it is exact in both directions — 33 constraint groups, 39 networks, 221 variables, 409 geometry dependencies, 193 dependencies, 205 value dependencies, 193 dependency bodies (the only non-exact pairs are the R2010 originals' groups, whose nodes those older files list in hash order — the reference's own re-saves of the same files sort them as we do — and one network whose orphan action the reference dropped). With `writeDwg…(d, { respellAssoc: true })` an R2018 source's family goes natively into AC1021 in the R2010 spelling (class pairs re-paired) and an R2010 source's into AC1032 in the R2013 one, and the reference's DXFOUT lists every record natively (Structural - Metric into 2007: 7 networks, 6 groups, 56 geometry dependencies, 26 variables…). Off by default: such a file still draws silent AUDIT fixes (24 on Structural - Metric into 2007, 68 / 10 / 0 on Civil / Architectural / Structural - Imperial into 2018), with six constraint parameters erased on the first — yet a 2007 file of ours written FROM the reference's own 2007 save (the same pre-2013 records) audits clean with the family native, and every record, class pair, entity reactor and dictionary entry compared between our translated file and the reference's save is identical; what differs is the sample itself: ten of its ACDBASSOCDEPENDENCY records point (soft, code 4) at dependencies of an unreferenced anonymous representation block's network (`*U1`, 39 records the reference drops on open and its DXFOUT never lists), which the reference's own save re-targets to the definition block's dependencies — a re-targeting this writer does not do yet |
+| What the reference's DXFOUT lists of the family | ✅ its DXFOUT of the untouched Structural - Metric lists 80 geometry dependencies and 38 variables where the DWG holds 96 and 44 — the 39 records short are exactly the network of the anonymous representation block `*U1` (handle 364E: the network 3687 under the block's extension dictionary, its constraint group 365F, 16 geometry dependencies, 6 variables, 5 dependencies, 5 value dependencies, 5 parameter dependency bodies), which the reference drops on open — its own saves into every release hold 7 networks, 229 family records, never 8 and 268. The same 80/38 in every leg of ours is therefore the reference's own behaviour, not a loss of this writer's (its DXFOUT of our 2018 file lists the same 80/38 with the census matching the original) |
+| A DXF-format payload's class number | ✅ a from-DXF proxy re-emitted into a DWG (the reference's own for a class it could not load, or this library's for a tag-born record) names its class inside the payload (`BL 499|498, BL class number`) — the source file's number; each file numbers its classes for itself (a DICTIONARYVAR class registered before the proxy's moves it by one), so the writer puts this file's number into the head of the payload and copies the rest of the bits verbatim, both spellings of the number being the two-word form. A second generation of a DXF-born FIELD keeps its class resolvable |
+| Self-validation (`auditDrawing` + `nasjidwg audit`) | ✅ the library's own AUDIT pass: duplicate handles, dangling layer/linetype/block/style references, missing group members, non-finite geometry, header-extents mismatch — errors first, never throws; the CLI exits nonzero on errors |
+| Sealed data through DXF | ✅ proxies leave as real ACAD_PROXY_ENTITY / ACAD_PROXY_OBJECT records (92/310 graphics, 93/310 data with the bit count, 330/340 refs, class in CLASSES) and parse back — so the payload survives any path through the library, DWG↔DXF included, in ASCII and binary DXF both. An R2007+ filer's proxy (format code 27 and up) carries its string stream too: the strings past the record's "cn:<class>" text close the 93/310 payload the way a sealed record's do (string bits, size word, flag; a bare 0 bit when there are none), and `readDxf` puts them back behind "cn:" — measured on the reference with a proxy of a class it lacks (data 87 bits, strings 374 with "cn:"): its own 2018 DXF spells the same strings apart under 162/311 (188 bits, "cn:" left out) and the data under 161/310 (not "bits and bytes of the data", as this reader once guessed), our DXF (93 = 87 + 188 + 17 = 292) opens at AUDIT 0 and its DXFOUT keeps the proxy at 161 = 87 / 162 = 188, and `readDxf` of either DXF gives the DWG's data and string stream back bit for bit. A proxy of a class of the reference's own reads back as the seal (unwrapped on open); any other application's class stays a proxy object, as in a DWG |
+| DXF tag storage | ✅ an unknown DXF entity or object retains its complete raw tag list verbatim and re-emits it (its own handle, owner and the two identity fences — extension dictionary, reactors — are re-derived from the model; under `preserveHandles` the body is verbatim, otherwise its handle-typed groups 320–369 and 1005 are remapped through the output's numbering and nulled when the target is not written; a hard reference into nothing keeps the record home) — parity with ezdxf's one former advantage |
+| Byte-preserving rewrite (`retainRecords` + `verbatimRecords`) | ✅ read with `readDwg(bytes, { retainRecords: true })`, write with `{ preserveHandles: true, verbatimRecords: true }`, and every entity still carrying the record the reader sealed is emitted from those exact bytes instead of being re-encoded — incremental-save fidelity without an incremental container. Symbol tables keep their source handles so those bytes stay meaningful; the object map, size prefixes, R2010+ handle-stream split, CRCs and container are built as always. Verified byte-identical over three generations at R13/R14/R2000/R2004/R2018, each opening in AutoCAD with AUDIT 0 errors. Off by default, a no-op without `preserveHandles`, and refused for foreign encoding generations, mismatched record types, XDATA carriers and the entity kinds whose records reach into objects this library mints fresh (dimension, mline, image, insert-with-attributes, ACIS, the class-numbered records). **The contract: a caller that changes an entity must `delete entity.record`** — the writer trusts the seal rather than diffing it |
+| Mutation fuzz | ✅ 840 seeded byte mutations + truncations across all 7 written containers, every run: the reader either decodes with a warnings array or throws an ordinary Error — never hangs, never leaks a non-Error |
+| SHX shape fonts | ✅ full bytecode interpreter (16-direction vectors, octant / fractional / bulge arcs, subshapes, push/pop, scale, vertical-skip; unifont structurally), font registry, and the SVG/PDF exporters draw text as the font's real vector strokes when a font is registered — byte-identical output when none is |
+| External validation vs AutoCAD | ✅ `node tools/validate-external.mjs` drives AutoCAD 2027's Core Console (open + AUDIT per container) with a regression-gated PASS_BASELINE of **all seven writable release families — R12, R13, R14, R2000, R2004, R2007 and R2018 — every one opening AUDIT-CLEAN 0/0 on the full corpus**: every entity family, the hand-built ASM solid (carried in the AcDs section, as 2013+ requires), the Bill-of-Materials table with merged cells (AutoCAD's own DXFOUT returns every cell string), MULTILEADER with its synthesized Standard MLEADERSTYLE, and Arabic layer names normalized clean. Nine campaign rounds burned ~70 splice-proven format rules into the writers and structural tests — among them: the R2004 LZ terminator is `0x11 0x00 0x00`; CLASSES bind positionally, number densely from 500, and may not be empty from R2007 on; R2010+ LEADER keeps endptproj and drops box h/w; R13/14 BT/BE are full BD/3BD; the R2010+ TABLE folds TABLECONTENT into the entity and closes with a five-field break range; R2018 MTEXT carries an annotative/column tail; R2007+ symbol names travel raw UTF-16; AC1032 stores ACIS as ASM blobs in AcDs while AC1021 reads only the pre-ASM form, inline, starting on the bit after its version field and followed by a cached wireframe block. Several were symmetric reader+writer beliefs no self-round-trip could catch — exactly what the external loop exists for. One ledger is still open and honourably so: every ledger closed |
+| Reader certified against real AutoCAD files | ✅ **317 real drawings, 139 MB, spanning 1982 to 2027** — every AutoCAD 2027 sample library, field drawings up to 3 MB from real producers, vintage R1.4/R2.6/R2.10/R9/R10/R12/R13/R14 files, and 49 purpose-minted references — all read with **zero throws, zero timeouts, zero CRC mismatches** in 13.2 s with CRC verification enabled, and the decoded geometry matches AutoCAD's own DXFOUT field for field. The whole corpus produces four warning occurrences in total. Twelve reader defects the generated corpus could never expose were found and pinned, among them: the R2007 table cell grammar and the R2010+ inline grid (real tables had been decoding as empty stubs); MLINESTYLE's per-element linetype (a data-stream index through R2013, a handle only from R2018 — this alone had been sealing the record on 155 of 280 files, and the same error lived in the R2007 writer); the MTEXT background-scale field (BD, not BL — 89 MTEXTs were being sealed with their text already parsed); XRECORD trusting a declared size that overran the record; a header-extents guard that let a Z of 7.35e+223 through; the DICTIONARY hard-owner byte that starts at R13c3 (61 of 71 dictionaries in a genuine R13 file were failing silently); GROUP naming; anonymous-block numbering; the 2004+ CMC ByLayer/ByBlock methods; and entities whose owner resolves to nothing, which now land in model space with a warning instead of vanishing. **No test reads any of these files** — they are external oracles only; the suite still generates every fixture it asserts on |
+| OLE2FRAME write | ✅ R14→R2018: frame + embedded compound document byte-for-byte; a hand-built entity gets its 0x62-byte frame header synthesized from the corners. R13 (which predates OLE2FRAME) reports the skip |
+| Dynamic-block visibility write | ✅ R2000→R2018: blocks with visibility states leave as a real BLOCKVISIBILITYPARAMETER — name, prompt, member list and per-state entity lists remapped onto the written file's handles — inside the graph the reference builds around it (the block's extension dictionary → ACAD_ENHANCEDBLOCK → ACAD_EVALUATION_GRAPH hard-owning the parameter, its grip and the grip's two location components, a purge preventer beside it), spelled as the reference spells it in every release. A lone parameter owned by the block header was refused outright (ErrorStatus 53) in every release; with the graph the reference opens the rewrite at AUDIT 0 (R2000/R2004/R2007/R2018) and its own DXFOUT of it re-emits the graph node for node with every state name. A genuine dynamic block read from the reference's own drawing keeps its states the same way — the stale sealed graph stays home unreported, replaced by the rebuilt one; the block's other parameters and actions are still written static, and `downgraded` says so |
+| Draw order (SORTENTSTABLE) write | ✅ a default write needs no table — fresh handles ascend in array order, and array order IS the draw order. Under `preserveHandles`, every space whose array order differs from its ascending handle order gets a native SORTENTSTABLE under an ACAD_SORTENTS entry in the block record's extension dictionary, its sort keys reusing the space's own handles (the i-th array entity sorts under the i-th smallest handle — no fresh numbers, no collisions). Verified on a 72 MB field drawing: 232,382 model entities keep their exact draw order through a preserved rewrite. R13/R14 cannot name the class and report the skip |
+| R2007+ string-stream sizes past 0x8000 bits | ✅ the two-word spelling the readers always accepted (high word first, low word carrying the 0x8000 continuation flag) is now written too. The old single-word write silently truncated the size: a drawing registering a few hundred application classes — the 72 MB field file carries 245 — wrote a CLASSES section that read back as ZERO classes, and every class-typed record in the file went sealed or missing with it |
+
+## DWG write — entity coverage
+
+Every natively-modeled entity is encodable: line, point, circle, arc,
+ellipse, lwpolyline, text (+Arabic shaping), mtext, insert/minsert with
+attribs + SEQEND, spline (both scenarios), solid, ray/xline, 3dface,
+shape, tolerance, leader, viewport, mline, polygon/polyface meshes with
+their vertex chains, images (+CLASSES and IMAGEDEF objects), hatch
+(exact edges, deflines, seeds, gradient, associativity with remapped
+boundary handles), all 8 dimension kinds, LIGHT,
+MULTILEADER (its own AcDbMLeader record in every container), ACAD_TABLE
+(its own record everywhere — through R2007 as the inline grid, from
+R2010 as the placed entity plus its paired TABLECONTENT object),
+PDF/DGN/DWF underlays with their shared definition objects, and ACIS
+solids — SAT in every container, SAB from R2007 on in the kernel dialect
+that container reads, and a binary payload leaves a target that cannot
+hold it through the SAB→SAT conversion.
+
+Nothing is downgraded in the R13+ writers any more; the `downgraded`
+list exists for targets that genuinely lack a record (the R12 writer).
+Anything a writer cannot emit at all lands in `skipped`; nothing is
+dropped silently. On the R2000/R2004/R2018 fixtures both lists come
+back empty.
+
+The R12 writer speaks the byte-aligned pre-R13 record set natively: line,
+point, circle, arc, text (+attribs), solid, 3dface, shape, 2D polylines
+with bulges/widths, polygon and polyface meshes with their vertex chains,
+insert (+ATTRIB/SEQEND), all 7 R12 dimension kinds, viewport. Entity text
+travels as `\U+` escapes (Arabic included, losslessly); table names are
+bound to CP1252, which is what the format itself can hold. What R12 has
+no record for is downgraded to visible geometry (ellipse/spline →
+polyline, mtext → text lines, hatch → pattern lines, table → grid +
+text, leader/mleader/mline → polylines, tolerance → text) and the rest
+(ray/xline, images, ACIS, paper space) is reported in `skipped`.
+
+## DXF
+
+| Capability | Status |
+|---|---|
+| ASCII write (R2000) full entity set | ✅ dimensions-by-kind, exact hatch edges + gradient, mline, mesh, image w/ CLASSES + OBJECTS sections, Arabic pipeline, saved view |
+| ASCII write: ACAD_TABLE and MULTILEADER natively | ✅ each leaves as its own record in the spelling the reference's own R2000 DXFOUT uses — the class pair in CLASSES, the table's anonymous `*T<n>` block record and block, the R2000 cell grammar (171…145 per cell, 3-chunked text or 340/144/179 block with its 331/300 attribute values, the 177 override word with 170/283/63/64/7/140 and the edge groups 27x/28x/6x in the reference's own right-bottom-left-top order, 172 announcing the overridden edges — its DXFIN ignores an edge the byte does not name; 93 with 280/281/70/40/41 at table level), the multileader's fenced CONTEXT_DATA / LEADER / LEADER_LINE tree with its style-level tail, block labels (330/177/44/302 between 293 and 294) and ACAD_MLEADERVER stamp — pointing (342 / 340) at the drawing's own TABLESTYLE / MLEADERSTYLE under ACAD_TABLESTYLE / ACAD_MLEADERSTYLE, each spelled as the reference's R2000 DXFOUT spells it (a "Standard" synthesized when the drawing names none); `readDxf` reads the styles back by their dictionary names, the R2007+ spelling's version word and value-format groups included. Verified externally: the reference opens the DXF of its own tables sample (2 ACAD_TABLE, 66 cells equal), multileader sample (21 MULTILEADER) and A-03 sheet (3 tables, 832 cells equal) at AUDIT 0 errors with the census matching the source, and `readDxf` returns the same grids and leaders. A table met only inside a proxy's picture still leaves as grid + text |
+| ASCII write: external references | ✅ `BlockDefinition.xref` leaves as an attachment — BLOCK 70 = 4 (+ 8 overlay) with the stored path in group 1, no owned entities — and the `xref\|name` layers, linetypes and text styles travel beside a block written that way, flagged 70 = 48 (dependent + resolved) as the reference's own DXF spells them; with no such block they stay home, as before (the DWG writer's rule). Verified on A-01: the reference reopens the DXF with both attachments resolved (BLOCK 70=44 / 70=36, paths intact, 51 dependent layers) at AUDIT 0, and with the `Res` folder absent it opens unresolved (70=12 / 70=4) exactly as it opens its own DXF |
+| ASCII tolerant read | ✅ never throws; every model type incl. ATTDEF, ARC_DIMENSION, mesh flavors, IMAGEDEF paths; SORTENTSTABLE draw order applied the same way the DWG reader applies it; a BLOCK flagged xref (70 bits 4/8) reads into `BlockDefinition.xref` with its group-1 path, as the DWG reader keeps it |
+| Binary DXF read | ✅ verified against a real-world binary DXF byte stream |
+| Binary DXF write | ✅ round-trip tested |
+| OBJECTS section write (root dict, layouts, groups, mline styles, image defs, table + multileader styles, the variable dictionary) | ✅ the table and multileader styles are the drawing's own (`drawing.tableStyles` / `drawing.mleaderStyles`), one record per name; the reference reopens our DXF of its tables sample, multileader sample and A-03 sheet at AUDIT 0 with "Drawing Legend", "SCHEDULE" and "BlockMLeader" listed under their dictionaries. Every `drawing.mlineStyles` record goes under ACAD_MLINESTYLE (flags, description, fill colour, cap angles, the elements' 49 offset / 62 colour — the nearest ACI for a true colour — / 6 linetype), its extension dictionary re-attached and its number kept under `preserveHandles`, each MLINE's 2 and 340 naming its own (Standard when it names none); `readDxf` reads the styles back with their handle, xdict and fill colour and resolves an MLINE's style by name, else by its 340. `drawing.variables` go out as the root's `AcDbVariableDictionary` in the reference's R2000 spelling — one `DICTIONARYVAR` per variable (`100 DictionaryVariables`, `280` schema, `1` value), the dictionary as owner and reactor, the class declared, a DICTIONARYVAR that arrived sealed as tags under that dictionary consumed into the list — and `readDxf` reads the root's back into `drawing.variables` (name by the key, value, schema, handle, xdict; the dictionary itself consumed, `structureHandles.ACDBVARIABLEDICTIONARY` and `NOD` recorded), a DICTIONARYVAR anywhere else staying sealed as tags. Proven on the reference: A-01.dwg → DXF reopens at AUDIT 0 with `(entget (handent "27B7C"))` = DICTIONARYVAR (CMLEADERSTYLE) and its DXFOUT listing DICTIONARYVAR 11; the reference's own DXF of A-01 through readDxf → writeDxf the same |
+| Ownership through DXF (`writeDxf(d, { preserveHandles })`) | ✅ the DXF codec carries the same ownership facts as the DWG one. Reader: every entity's and record's `xdict` (the `102 {ACAD_XDICTIONARY 360 h 102 }` fence) and `reactors`, each LAYER/LTYPE/STYLE/BLOCK_RECORD/LAYOUT handle, every dictionary that is not the reader's own sealed with its decoded `entries`, hard-owner flag and cloning code (the extension dictionaries and the unmodeled branches of the tree — ACAD_SCALELIST, ACAD_VISUALSTYLE, AcDbVariableDictionary …), each XRECORD sealed under its owner, a hatch's boundary objects. Writer: every sealed object goes out under its original owner when that owner is written (an entity, a block record — the two spaces through their layouts' `blockHandle` — a table record, a layout, a proxy, a sealed object), re-listed by a sealed dictionary from its entries (an entry whose target is not written is left out, this writer's own draw-order table joins the rest), with the `360` fence on the owner and `{ACAD_REACTORS` for every written target, settled to a fixed point (an owner that stays home strands its chain; a dictionary with nothing to list is dropped quietly; a hard 340/360 into nothing keeps the record home); the tree dictionaries are the source's own sealed ones where they travel, rebuilt plain otherwise. Under `preserveHandles` every entity, table record, block record, layout, object and sealed object keeps its source number and fresh ones are minted above the highest — a space out of handle order gets a SORTENTSTABLE under ACAD_SORTENTS in the reference's spelling. An associative hatch leaves with its boundary links (97/330) and the reactor on each boundary entity, non-associative when they are not here. **A record sealed as DWG bits** — what a DWG read keeps for a FIELD, a FIELDLIST, a SPATIAL_FILTER, an evaluation graph and its parameter/grip/action nodes, a DATALINK, a TABLEGEOMETRY, a CELLSTYLEMAP, a SCALE, a MATERIAL, a VISUALSTYLE, a PLOTSETTINGS, a whole AcDbAssoc* constraint network — leaves as the `ACAD_PROXY_OBJECT` of its class: the reference's own form for an object whose enabler was absent when the file was saved, which it unwraps to the native object on open when the enabler is present. The payload is the record's data area exactly as an object record of its generation lays it out (the data bits; from R2007 the string stream behind them, its size and the strings-present flag as the last bit — a bare 0 bit when there are no strings), under `95` = the drawing-format code of the filer that wrote the bits (23 R2000, 25 R2004, 27 R2007, 29 R2010, 31 R2013, 33 R2018 — the source file's own version when the record's encoding group is the file's), `70` = 0 (DWG format), `93` = the payload's bit count, the reference list under the DXF group of each handle code (350/360/330/340 for owner-soft/owner-hard/pointer-soft/pointer-hard), the class in CLASSES. Measured on the reference with A-01's 102 FIELDs: the data bits alone unwrap only the records whose strings happen not to matter (27 of 102), a count-prefixed envelope hangs its loader, and this layout unwraps every one on open — `(entget)` answers FIELD, and its own DXFOUT lists them natively. Because the payload names its own filer, bits from a later generation than the AC1015 file travel too — the version axis binds the tagged records alone (from a post-R2000 source the R2008+ spellings the AC1015 filer refuses stay home, reported: TABLECONTENT, DATALINK and the AcDbAssoc* family as tags, which the reference respells at R2013 and stops on with "Premature end of object"). `readDxf` unwraps such a proxy back to the seal the DWG reader keeps (data, strings, references, encoding), so our DXF read back and written as a DWG of the bits' generation is native again (A-01 → DXF → readDxf → 2007 DWG: AUDIT 0, `(entget (handent "26EFF"))` = FIELD), and a second `writeDxf` spells the same payload; a DXF-format proxy (70 = 1), one without data, or one under a code unknown here stays a proxy object. Proven on the reference, every leg AUDIT 0 with the source's census, both handle modes: **A-01.dwg → DXF**: `(entget (handent "26EFC"))` shows the MTEXT's 360 → ACAD_FIELD → FIELD 26EFF with its five child FIELDs, the "Drawing Title" block's xdict → ACAD_ENHANCEDBLOCK → ACAD_EVALUATION_GRAPH 277F2 with BLOCKLINEARPARAMETER/BLOCKLINEARGRIP/BLOCKGRIPLOCATIONCOMPONENT/BLOCKSTRETCHACTION and the purge preventer, and the reference's DXFOUT of our file lists FIELD 102, FIELDLIST 1, the whole graph, SCALE 33, VISUALSTYLE 26, MATERIAL 3, PLOTSETTINGS 3, DICTIONARYVAR 11; **Site Grading Plan.dwg**: INSERT 211 → ACAD_FILTER → SPATIAL → SPATIAL_FILTER 26E (both filters), 82 FIELDs; **Data Extraction.dwg**: DATALINK 8E99, TABLEGEOMETRY 8F6B/90EB, the FIELDs, DXFOUT lists DATALINK 1, TABLECONTENT 2, TABLEGEOMETRY 2; **Structural - Metric.dwg** (an R2018 source): the eight ACDBASSOCNETWORKs, three ACAD_EVALUATION_GRAPHs with BLOCKPROPERTIESTABLE and the constraint parameters, DXFOUT lists ACDBASSOCNETWORK 8, ACDBASSOC2DCONSTRAINTGROUP, ACDBASSOCGEOMDEPENDENCY … natively. The reference's own DXF of each through readDxf → writeDxf (tags verbatim) reopens the same way (A-01: the FIELDs evaluated on open; Site Grading Plan; Structural - Metric's three graphs with their draw-order tables; Data Extraction with DATALINK/TABLECONTENT reported home) |
+| Pre-R13 binary DXF (1-byte codes, 255 escape) | ✅ read (auto-detected) + write via `writeDxfBinary(d, { narrowCodes: true })` |
+
+## Text / i18n
+
+| Capability | Status |
+|---|---|
+| Arabic shaping to Presentation Forms-B + lam-alef | ✅ |
+| Unshaping + signature detection, bracket mirroring | ✅ |
+| \U+XXXX escapes, %%-codes, CP1252 | ✅ |
+| 29 single-byte codepages (1250–1258, 874, ISO-8859-2..9, DOS 437/850/852/855/857/860/861/863/864/865/866/869, Mac) | ✅ generated from Unicode.org tables |
+| Correct DWG codepage-number map (29=1251, 35=1256, …) | ✅ |
+| CJK double-byte pages (932/936/949/950, BIG5, GB2312, JOHAB) | ✅ generated tables, lazily unpacked; EUC and 8-bit code forms both resolve |
+| MTEXT full inline-code parser (fonts/colors/stacking) | ✅ parseMtext() |
+| \M+ MIF escapes | ✅ decode + encode |
+
+## Beyond file IO
+
+| Capability | Status |
+|---|---|
+| Bounding boxes (entity + drawing, insert-aware) | ✅ |
+| 2D transforms + deep clone | ✅ a transform that is not a similarity turns a circle, arc or ellipse into the ellipse it really becomes (conjugate semi-diameters → axes + parameter shift), so explode and both exporters place a squashed round curve where AutoCAD draws it |
+| Explode: insert (recursive), polyline→arcs | ✅ |
+| Explode: hatch pattern lines | ✅ clipped to boundaries, with dashes |
+| Dimension geometry generation | ✅ `explodeDimension`: extension/dimension lines, arrowheads, measurement text (with `<>`/override rules and DIMSCALE/DIMTXT/DIMEXO/DIMEXE) for linear, aligned, radius, diameter, both angulars and ordinate — SVG/PDF fall back to it, and the R12 writer materializes it as a real *D block |
+| SVG export (all entity families, Arabic RTL) | ✅ |
+| GeoJSON export (all geometric types) | ✅ georeferenced to WGS84 lon/lat through the GEODATA anchor when the drawing carries one |
+| JSON lossless round-trip | ✅ |
+| ACIS/ASM wireframe extraction | ✅ `acisWires(entity)` — a solid's kernel stream turned into the polylines a CAD program draws it with. Measured against AutoCAD's own XEDGES below |
+| Thumbnail extraction (BMP/PNG) | ✅ |
+| .pat hatch pattern files | ✅ read + write, verified on a real library |
+| CLI tools (info, convert, layers, grep, thumb) | ✅ convert targets .dwg .dxf .dxb .svg .pdf .json .geojson; `convert --verify` re-reads the written file and reports the round trip; `layers` lists names, colors, linetypes and state flags |
+| PDF export | ✅ standalone single-page PDF 1.4, real vector paths, no dependencies: every entity family incl. nested inserts, hatch fills, arcs as exact cubics, tables and mesh faces; text it cannot draw with a standard font is reported, never dropped. Plot control: explicit sheet (`width`/`height`), fixed `scale`, `offset`, window `clip` and `monochrome`. Both exporters frame `contentBounds`, so a georeferenced drawing is not printed as a speck |
+
+
+### Solid wireframes: what the extractor does, and what it does not
+
+A 3DSOLID stores surfaces, not lines. What a CAD program draws for it in
+wireframe is its EDGES — the curves where two faces meet — and that is what
+`acisWires(entity)` returns: `Point3[][]` in model coordinates, computed on
+first use and remembered against the entity, so opening a drawing costs
+nothing until something asks to see the solids.
+
+```ts
+import { readDwg, acisWires } from 'nasjidwg';
+const drawing = readDwg(bytes);
+for (const e of drawing.entities) {
+  for (const polyline of acisWires(e)) draw(polyline);  // [] for anything else
+}
+```
+
+`parseSab` / `parseSat` expose the layer beneath: the whole stream as a flat
+record graph (`AcisRecords`), fields in parallel typed arrays because a
+drawing's solids can carry a quarter of a million records between them.
+`acisWiresFromPayload(bytes | text)` skips the entity wrapper.
+
+**Reads.** Both dialects — modern ASM/ACIS binary (SAB) and the classic
+SAT text — from the same grammar. Topology: body → lump → shell → face →
+loop → coedge → edge, with the tolerant variants (`tedge`, `tcoedge`,
+`tvertex`) and the body `transform`. Pointers resolve by what they point AT
+rather than by slot number, so the field-layout drift between kernel
+versions does not move the geometry. A stream still sealed inside a DWG
+record is found at whatever BIT offset the record's own fields left it.
+
+**Evaluates.** `straight` (the direction is used exactly as stored — ACIS
+does not keep it unit, and the edge's parameters are measured against the
+length it has), `ellipse` (circles, arcs and true ellipses), and `intcurve`
+in its `exact_int_cur`, `int_int_cur` and `par_int_cur` forms through their
+approximating B-spline — de Boor, rational or not, with ACIS's own knot
+convention where the end multiplicities are written one short of clamped.
+An intcurve read against its spline (negated parameters) and a periodic one
+whose parameters wrap past the knot end are both handled, detected from the
+numbers rather than from a flag the two dialects spell differently.
+
+**Approximates.** Curves are tessellated to a chord tolerance keyed to the
+body's own size (and never more than 45° of arc a segment), so a handrail
+fillet and a ramp deck get the same smoothness rather than the same segment
+count. Edge ends are snapped to the kernel's own vertex points, so
+neighbouring edges close on a shared point.
+
+**Drops.** Zero-length edges. An `intcurve` whose definition is a `{ ref N }`
+reference to another subtype object in the stream is drawn as the chord
+between its (exact) vertices — the ordinal space those references address is
+not yet resolved; it is 134 of 30,351 edges, 0.44%, in the corpus below.
+Faces, surfaces and shading are not produced at all: this is a wireframe,
+which is what a 2D CAD viewer draws.
+
+**Measured against AutoCAD.** A 19.5 MB R2007 architectural drawing (1,660
+3DSOLID/REGION/SURFACE entities in model space, ASM 225.1) put through
+AutoCAD 2027's own **XEDGES** command, its output written to DXF at 16
+decimals and compared entity for entity:
+
+| | AutoCAD XEDGES | nasjidwg | |
+|---|---|---|---|
+| straight edges | 23,650 LINE | 23,650 | every one matched endpoint-for-endpoint within 1e-4 units; **zero unmatched on either side** |
+| circles/arcs/ellipses | 4,574 ARC + 1,160 CIRCLE + 769 ELLIPSE = 6,503 | 6,503 | |
+| spline edges | 1,596 SPLINE | 1,600 | |
+| **total edges** | **31,749** | **31,753** | +0.013% |
+| curved-edge endpoints | 13,860 | 13,416 matched, **none unmatched** | mean error 1.7e-6, max 5.1e-4 on coordinates of ~7×10⁵ — the kernel's own approximation tolerance |
+| closed rings | 1,169 | all 1,169 matched | max centre error 5.7e-4 |
+
+Extraction of all 1,916 bodies takes **~700 ms** — measurable beside the
+1.9 s the file's own read costs, which is why it is lazy and memoized rather
+than a field populated at read time.
+
+**One record type stays sealed.** That drawing's 256 `SURFACE` (AcDbSurface)
+records are not modelled as `acis` entities, because the writers have no
+SURFACE class record to emit them through and turning them into a modelled
+entity would lose them on write, where today they pass through byte-exact.
+They *do* carry ASM payloads — at bit offset 4 inside the retained record —
+and `acisWires` reads them straight out of the sealed bits, so nothing is
+undrawable for the sake of the seal.
+
+
+## Capability summary
+
+The axes a DWG/DXF library is judged on, and where this one stands:
+
+| Axis | Status |
+|---|---|
+| DWG read R13–R2018 | ✅ all 8 container versions |
+| DWG read pre-R13 (R1.x–R12) | ✅ nine fixtures from 1983 onward |
+| DWG write R2000 / R2004 | ✅ compressed pages |
+| DWG write R2007 | ✅ externally gated at AUDIT 0, ACAD_TABLE included; an ASM-dialect ACIS payload leaves as SAT or is reported |
+| DWG write R2010 / R2013 / R2018 | ✅ compressed pages |
+| DWG write R12 (AC1009) | ✅ |
+| DWG write R10 / R9 / R2.6 / R2.10 | ✅ round-trip verified per release |
+| Proxy passthrough (0x1F2 + 0x1F3) | ✅ payload bit-exact, graphics byte-exact, refs code-exact, class re-emitted — every container R13→R2018 |
+| OLE2FRAME | ✅ read + write (R14+), document byte-for-byte |
+| Dynamic-block visibility | ✅ read + write (R2000+) |
+| ACAD_TABLE | ✅ read and written in every container. AC1021 keeps a cell's content as a full table VALUE — the additional-data flag, the format flags, the data type, the text inline as byte-counted UTF-16, the unit type, then the value's format string and rendered form in the record's string stream — which is why a bare string there was refused; pinned against AutoCAD-minted AC1021 tables and verified by AutoCAD reading our output back cell for cell (R2010+ writes through the paired TABLECONTENT object) |
+| MULTILEADER | ✅ read + write, its own record — block labels (attribute values) included — in DXF too, where the reference reopens the 21-multileader sample from our DXF at AUDIT 0 and re-exports the labels |
+| TABLESTYLE / MLEADERSTYLE write | ✅ one record per `drawing.tableStyles` / `drawing.mleaderStyles` entry (plus a synthesized Standard when the drawing names none) under ACAD_TABLESTYLE / ACAD_MLEADERSTYLE, handles kept under `preserveHandles`, every table and multileader pointing at the style its `styleName` names; the class pair travels with each. R2000 … R2007 write the row-style record, R2018 the cell-style map, both in the reference's own bit layout. Verified externally on the reference's tables sample, multileader sample and A-03 sheet: rewritten at 2018 (handles preserved and renumbered) and at 2000 / 2004 / 2007, `(entget (handent …))` of the written "Drawing Legend" returns the source's 1.5 margins, 3.0 / 5.0 / 4.0 text heights, ByLayer text, invisible borders and `%tc1` format, "SCHEDULE" its SANS-115 / ROMANS-115 styles and 0.0625 / 0.1875 heights, and the multileader sample's two styles their 1.5 landing gap, 5.0 dogleg, 2.5 arrowhead, 3.0 text height and block content — all fifteen outputs (three drawings × 2018 kept / 2018 renumbered / 2000 / 2004 / 2007 / DXF) at AUDIT 0 with the census unchanged. Every ACAD_TABLE now also carries its own anonymous `*T` block record (the one it was read with, or an empty one minted for it): a table pointing at a real TABLESTYLE beside a NULL block header is audited "BTR Id invalid" and erased, while the same table with a NULL style had audited clean — externally proven on the corpus and the samples. The R2010+ record has no field for the title/header suppression switches (the reference keeps them beside it), so they travel through R2007 and DXF only |
+| ACIS solids | ✅ SAT write everywhere, SAB from R2007 in the dialect that container's kernel reads (pre-ASM inline at AC1021, ASM through AcDs at AC1032), and SAB→SAT conversion so a binary payload reaches a target that cannot hold it |
+| GEODATA + georeferenced GeoJSON | ✅ DWG and DXF read, DXF write, WGS84 output |
+| Dimension geometry generation | ✅ `explodeDimension` |
+| LIGHT, point clouds, OLE frames | ✅ modeled (LIGHT and OLE2FRAME also written) |
+| PDF export | ✅ standalone vector, no dependencies |
+| Arabic/RTL pipeline | ✅ shaping, escapes, codepages |
+| Codepages | ✅ 29 single-byte + 5 CJK + MIF escapes |
+| Underlays (PDF/DGN/DWF) | ✅ all three kinds, read and write, DWG and DXF |
+| Dynamic-block parameters + actions | ✅ visibility states and nine parameter kinds with their labels and value sets |
+| OCS / arbitrary-axis handling | ✅ extrusion retained, round-tripped, and resolved in bounds and every export (`toWcs`). The writer used to forge +Z on every OCS entity but ELLIPSE — 698 arcs, 20 circles, 23 inserts and 50 polylines in a 72 MB field drawing landed displaced. A negated normal is a reflection: a reference comes out mirrored (negative X scale, rotation reversed), not turned by pi. ELLIPSE is the format's exception — its centre and major axis are spelled in WCS, so a negated normal turns its sweep and moves nothing |
+| Degenerate curvature (arc-fit leftovers) | ✅ a bulge under 1e-8, an ARC whose two angles are bit-identical, and a hatch edge that wraps all but a hair of a turn the wrong way round collapse to what AutoCAD draws — the chord, nothing, and the hair — in bounds, in boundaries and in every export; an arc is boxed by the run it draws, not by the circle it was cut from |
+| Rotated layouts (VIEWTWIST + header UCS) | ✅ read, written, DXF both ways, and `viewTwistTransform` / `ucsTransform` for consumers |
+| Adversarial-file corpus | ✅ 18 regression cases covering the structural quirks real-world producers emit |
+| Validate-by-round-trip tooling | ✅ `convert --verify` |
+
+## Performance
+
+`npm run bench` times the built library over the synthetic 2000-entity
+drawing (the real fixtures are regenerated by the test suite, not kept
+in the tree). Development machine, Node 22, one core:
+
+| Operation | Time |
+|---|---|
+| readDwg R2000 / R2018 (synthetic 2000 entities) | 3.3 / 3.4 ms |
+| readDxf R2000 | 6.6 ms |
+| writeDwg2000 / 2018 / R12 | 9.4 / 13.2 / 8.6 ms |
+| writeDxf / writeSvg | 2.5 / 4.5 ms |
+
+The scale test is a real 72 MB R2018 site drawing: 1.7M object records,
+246k model entities, 6,484 block definitions. 0.13.1 reads it in about
+**3.4 s**, down from 4.9 s, by removing allocation rather than
+reordering work — handle references resolve without materialising a
+{code,value} pair, colours are shared frozen singletons, the handle
+table is a dense array instead of a Map (its `set` was the hottest line
+of the whole read), the object map parses into parallel typed arrays,
+unaligned bit-packed doubles merge three 32-bit words through a reused
+scratch instead of eight byte reads, and R2004 pages decompress with
+block copies. Output verified byte-for-byte identical against 0.13.0 on
+three field drawings including the 72 MB one.
+
+(An earlier note here said a block-copy path for the LZ77 literal runs
+had been tried and removed as a loss. That was measured on a 1.2 MB
+file, where the runs are short; on the 72 MB file the same idea — one
+set() per literal run, copyWithin for non-overlapping back-references,
+byte-at-a-time kept for the overlapping runs that need it — is a clear
+win and is what ships now.)
+
+## Work queue (what is genuinely left)
+
+1. Validation of written files in an external CAD application. The
+   current guarantee is a full round trip through our own oracle-verified
+   reader across all containers plus AC1009; the external check is
+   `ODAFileConverter <in-dir> <out-dir> ACAD2018 DXF 0 1` — the trailing
+   `1` runs an audit over every file it loads (R12 output can be checked
+   the same way with `ACAD12`).
+2. Constraint parameters and grip records, and the vertical-application
+   classes (AEC, Civil, Mechanical): recognized and retained, not
+   modeled. They carry no geometry of their own, and both reference
+   libraries leave the same tier partial.

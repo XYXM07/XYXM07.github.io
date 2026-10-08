@@ -4,4 +4,5 @@ PDF-LIB 1.17.1 (MIT) https://github.com/Hopding/pdf-lib
 PDF.js 6.4.299 compatibility build (Apache-2.0) https://github.com/mozilla/pdf.js
 js-yaml 5.4.3 (MIT) https://github.com/nodeca/js-yaml
 fflate 0.8.3 (MIT) https://github.com/101arrowz/fflate
+nasjidwg 0.18.0 (MIT) https://github.com/NASJI-Packages/nasjidwg (DWG reading/writing; deployed locally, npm integrity verified)
 All packages downloaded from registry.npmjs.org; license texts accompany the libraries.

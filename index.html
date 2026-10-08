@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="discovery.css">
   <link rel="stylesheet" href="standard.css">
   <link rel="stylesheet" href="studio.css">
-  <link rel="stylesheet" href="plus.css?v=e5678acc4876">
+  <link rel="stylesheet" href="plus.css?v=41c8408827a8">
   <link rel="stylesheet" href="dino.css?v=f0b1b01fb329">
   <link rel="stylesheet" href="motion.css?v=db0fb7272bb9">
   <script src="config.js" defer></script>
@@ -51,8 +51,8 @@
   <script src="vendor/fflate.min.js" defer></script>
   <script src="fruit-logic.js?v=4b2380cedcd1" defer></script>
   <script src="fruit-game.js?v=37dbe5365f8e" defer></script>
-  <script src="cad-logic.js?v=af9e80cbf8fe" defer></script>
-  <script src="cad-studio.js?v=5f32d322adeb" defer></script>
+  <script src="cad-logic.js?v=3fa3c3c4944c" defer></script>
+  <script src="cad-studio.js?v=1f0fd889bd72" defer></script>
   <script src="plus-tools.js?v=53cd97075b86" defer></script>
   <script src="pdf-toolbox.js?v=860b2e4d8e32" defer></script>
 </head>
@@ -174,12 +174,12 @@
   <p id="pixel-status" class="play-status" role="status">32 × 32 像素。文件只在本机处理。</p>
 </section>
 <section class="tool-panel studio-tool" id="tool-cad" aria-label="二维 CAD 编辑" hidden>
-  <div class="tool-heading"><h2>二维 CAD 编辑</h2><p>绘制和编辑线段、圆、圆弧、多段线。支持 ASCII DXF、工程 JSON 与 SVG；暂不支持 DWG、三维实体和块参照。</p></div>
+  <div class="tool-heading"><h2>二维 CAD 编辑</h2><p>导入 DWG 后编辑线段、圆、圆弧和直线多段线，支持移动、属性修改及增删。图纸在浏览器本地处理；文字、图块和其他实体只读保留，外部参照及代理对象可能无法完整显示。DWG / DXF 最大 20 MB，工程 JSON 最大 100 MB。DWG 保存为 2000 兼容格式；无法完整写出的图纸会停止导出并提示。</p></div>
   <div class="studio-toolbar"><label>绘图方式<select id="cad-mode"><option value="select">选择 / 移动对象</option><option value="line">线段</option><option value="circle">圆</option><option value="rect">矩形</option><option value="polyline">多段线</option><option value="pan">平移画布</option></select></label><label>单位<select id="cad-unit"><option value="4">毫米</option><option value="5">厘米</option><option value="6">米</option><option value="1">英寸</option></select></label><label>捕捉间距<input id="cad-grid" type="number" value="10" min="0.01" max="10000" step="any"></label><label class="inline-check"><input id="cad-snap" type="checkbox" checked>网格捕捉</label><label>线条颜色<input id="cad-color" type="color" value="#202a2e"></label></div>
   <div class="mini-actions"><button id="cad-finish" class="button secondary">完成多段线</button><button id="cad-undo" class="button secondary">撤销</button><button id="cad-redo" class="button secondary">重做</button><button id="cad-delete" class="button secondary">删除选中</button><button id="cad-fit" class="button secondary">适合窗口</button><button id="cad-zoom-in" class="button secondary" aria-label="放大 CAD 画布">放大</button><button id="cad-zoom-out" class="button secondary" aria-label="缩小 CAD 画布">缩小</button><button id="cad-demo" class="button secondary">示例图纸</button><button id="cad-clear" class="button secondary">清空</button></div>
-  <canvas id="cad-canvas" class="cad-canvas" tabindex="0" aria-label="CAD 绘图画布，拖动绘制图形，滚轮缩放，Delete 删除，Ctrl Z 撤销"></canvas><p id="cad-cursor" class="help-note">X 0 · Y 0</p>
+  <p id="cad-native-summary" class="help-note"></p><details id="cad-dwg-notices" hidden><summary>图纸读取与保存提示</summary><ul id="cad-dwg-notice-list"></ul></details><canvas id="cad-canvas" class="cad-canvas" tabindex="0" aria-label="CAD 绘图画布，拖动绘制图形，滚轮缩放，Delete 删除，Ctrl Z 撤销"></canvas><p id="cad-cursor" class="help-note">X 0 · Y 0</p>
   <form id="cad-properties"><h3>对象属性</h3><p id="cad-selected">请选择一个对象。</p><div class="form-grid"><label>X / 圆心 X<input id="cad-x" type="number" step="any" disabled></label><label>Y / 圆心 Y<input id="cad-y" type="number" step="any" disabled></label><label>终点 X（线段）<input id="cad-x2" type="number" step="any" disabled></label><label>终点 Y（线段）<input id="cad-y2" type="number" step="any" disabled></label><label>半径（圆 / 圆弧）<input id="cad-radius" type="number" min="0.001" step="any" disabled></label><label>线宽<input id="cad-width" type="number" min="0.1" max="10" step="0.1" value="1" disabled></label><label>起始角（圆弧）<input id="cad-angle-start" type="number" step="any" disabled></label><label>结束角（圆弧）<input id="cad-angle-end" type="number" step="any" disabled></label></div><button class="button primary" type="submit" id="cad-apply" disabled>应用属性</button></form>
-  <div class="studio-toolbar"><label>导入图纸<input id="cad-file" type="file" accept=".dxf,.json"></label><button id="cad-dxf" class="button secondary">导出 DXF</button><button id="cad-json" class="button secondary">保存工程 JSON</button><button id="cad-svg" class="button secondary">导出 SVG</button></div><p id="cad-status" role="status">拖动绘制线段、圆或矩形。多段线逐点点击，完成后按 Enter。</p>
+  <div class="studio-toolbar"><label>导入图纸<input id="cad-file" type="file" accept=".dwg,.dxf,.json"></label><input id="cad-dwg-version" type="hidden" value="2000"><span class="help-note">保存格式：DWG 2000（AC1015），自定义颜色使用近似索引色</span><button id="cad-dwg" class="button primary">保存 DWG</button><button id="cad-dxf" class="button secondary">导出 DXF</button><button id="cad-json" class="button secondary">保存工程 JSON</button><button id="cad-svg" class="button secondary">导出 SVG</button></div><p id="cad-status" role="status">拖动绘制线段、圆或矩形。多段线逐点点击，完成后按 Enter。</p>
 </section><section class="tool-panel studio-tool" id="tool-decibel" aria-label="分贝测试" hidden>
   <div class="tool-heading"><h2>分贝测试</h2><p>主动开启麦克风后测量输入电平，声音不录制、不上传。默认显示 dBFS；经参考仪器校准后可显示估算声压级。</p></div>
   <div class="sound-readout"><span id="sound-label">数字输入电平</span><strong id="sound-value">—</strong><span id="sound-unit">dBFS</span><div class="sound-meter" role="meter" aria-label="麦克风输入电平" aria-valuemin="-100" aria-valuemax="0" aria-valuenow="-100" id="sound-meter"><i id="sound-fill"></i></div></div>

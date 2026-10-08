@@ -3,8 +3,8 @@
   const num=x=>{x=Number(x);if(!Number.isFinite(x)||Math.abs(x)>1e7)throw Error('坐标须为有限数字，绝对值不超过 1000 万');return x;};
   function validate(objects){
     if(!Array.isArray(objects)||objects.length>2000)throw Error('图形最多包含 2000 个对象');
-    return objects.map(o=>{const style={color:/^#[0-9a-f]{6}$/i.test(o.color)?o.color:'#202a2e',width:Math.max(.1,Math.min(10,Number(o.width)||1))};
-      if(['line','polyline'].includes(o.type)){if(!Array.isArray(o.points)||o.points.length<2||o.points.length>10000)throw Error('线条至少需要两个点');return {...style,type:o.type,closed:!!o.closed,points:o.points.map(p=>({x:num(p.x),y:num(p.y)}))};}
+    return objects.map(o=>{const style={color:/^#[0-9a-f]{6}$/i.test(o.color)?o.color:'#202a2e',width:Math.max(.1,Math.min(10,Number(o.width)||1)),...(typeof o.cadId==='string'&&/^\d{1,7}$/.test(o.cadId)?{cadId:o.cadId}:{})};
+      if(['line','polyline'].includes(o.type)){if(!Array.isArray(o.points)||o.points.length<2||o.points.length>10000)throw Error('线条至少需要两个点');if(o.type==='line'&&o.points.length!==2)throw Error('线段必须有且只有两个端点');return {...style,type:o.type,closed:!!o.closed,points:o.points.map(p=>({x:num(p.x),y:num(p.y)}))};}
       if(['circle','arc'].includes(o.type)){const r=num(o.r);if(r<=0)throw Error('半径须大于零');return {...style,type:o.type,cx:num(o.cx),cy:num(o.cy),r,...(o.type==='arc'?{start:num(o.start),end:num(o.end)}:{})};}
       throw Error('无法识别的图形类型');});
   }
@@ -19,7 +19,7 @@
     pair(0,'ENDSEC');pair(0,'EOF');return lines.join('\r\n')+'\r\n';
   }
   function dxfRead(text){
-    if(text.length>10000000)throw Error('DXF 文件过大');if(text.startsWith('AutoCAD Binary DXF'))throw Error('请选择 ASCII 文本 DXF，暂不支持二进制 DXF 或 DWG');
+    if(text.length>10000000)throw Error('DXF 文件过大');if(text.startsWith('AutoCAD Binary DXF'))throw Error('DXF 导入仅支持 ASCII 文本；DWG 请直接选择 .dwg 文件');
     const lines=text.replace(/^\uFEFF/,'').split(/\r?\n/),pairs=[];for(let i=0;i+1<lines.length;i+=2){if(!/^\s*\d+\s*$/.test(lines[i]))throw Error('DXF 分组代码无效');pairs.push([Number(lines[i]),lines[i+1].trim()]);}
     let inEntities=false,unit=4,ignored=0,poly=null;const objects=[];
     for(let i=0;i<pairs.length;i++){
