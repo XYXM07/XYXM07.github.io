@@ -1,0 +1,36 @@
+(function(r,f){if(typeof module==='object'&&module.exports)module.exports=f();else r.GardenLogic=f();})(typeof globalThis!=='undefined'?globalThis:this,()=>{
+  const icons=['leaf','flower','moon','star','drop','sun','gem','cloud','shell','sprout','fish','bell'];
+  function free(s,t){return !t.removed&&!s.tiles.some(o=>!o.removed&&(t.pile?o.pile===t.pile&&o.z>t.z:!o.pile&&o.z>t.z&&Math.abs(o.x-t.x)<.98&&Math.abs(o.y-t.y)<.98));}
+  function fresh(level=1,random=Math.random){level=Math.max(1,Math.min(3,level));const tiles=[];
+    const add=(x,y,z,region='main',pile=null)=>tiles.push({id:tiles.length,x,y,z,region,pile,kind:0,removed:false});
+    if(level===1){
+      for(let y=0;y<3;y++)for(let x=0;x<4;x++)add(2.5+x,2+y,0);
+      for(let x=0;x<6;x++)add(1.5+x,6,0,'reserve');
+    }else{
+      // Four interleaved stair towers, light reserve rows, and independent blind piles.
+      const layers=level===2?4:6;
+      for(const [ox,oy]of [[1.4,1.1],[4.6,1.1],[1.4,4.3],[4.6,4.3]])for(let z=0;z<layers;z++){
+        const size=z%2?2:3,shift=z%2?.5:0;
+        for(let y=0;y<size;y++)for(let x=0;x<size;x++)add(ox+x+shift,oy+y+shift,z);
+      }
+      const count=level===2?8:6;
+      for(const y of [0,8.1])for(let x=0;x<count;x++)add((9-count)/2+x,y,0,'reserve');
+      for(const [pile,x]of [['left',0],['right',8]])for(let z=0;z<(level===2?12:18);z++)add(x,3.7,z,'blind',pile);
+    }
+    const s={level,tiles,tray:[],shelf:[],moves:0,cleared:0,status:'playing',undos:3,shuffles:2,removes:1,history:[],solution:[]};
+    // Assign triples along a legal topological removal order, so every initial board has a solution.
+    for(let i=0;i<tiles.length;i++){const choices=tiles.filter(t=>free(s,t)),t=choices[Math.floor(random()*choices.length)];if(i%3===0)s.nextKind=Math.floor(random()*Math.min(icons.length,level*4));t.kind=s.nextKind;t.removed=true;s.solution.push(t.id);}
+    tiles.forEach(t=>t.removed=false);delete s.nextKind;return s;
+  }
+  function snapshot(s){return {removed:s.tiles.map(t=>t.removed),tray:s.tray.slice(),shelf:s.shelf.slice(),moves:s.moves,cleared:s.cleared,status:s.status};}
+  function pick(s,id,fromShelf=false){if(s.status!=='playing')return false;const t=s.tiles[id];if(!t||(fromShelf?!s.shelf.includes(id):!free(s,t)))return false;
+    s.history.push(snapshot(s));if(s.history.length>3)s.history.shift();if(fromShelf)s.shelf.splice(s.shelf.indexOf(id),1);else t.removed=true;
+    const last=s.tray.findLastIndex(i=>s.tiles[i].kind===t.kind);s.tray.splice(last<0?s.tray.length:last+1,0,id);s.moves++;
+    const match=s.tray.filter(i=>s.tiles[i].kind===t.kind);if(match.length===3){s.tray=s.tray.filter(i=>!match.includes(i));s.cleared+=3;}
+    if(s.tray.length>=7)s.status='lost';else if(s.tiles.every(t=>t.removed)&&!s.tray.length&&!s.shelf.length)s.status='won';return true;
+  }
+  function undo(s){if(!s.undos||!s.history.length||s.status==='won')return false;const old=s.history.pop();s.tiles.forEach((t,i)=>t.removed=old.removed[i]);Object.assign(s,{tray:old.tray,shelf:old.shelf,moves:old.moves,cleared:old.cleared,status:old.status});s.undos--;return true;}
+  function remove(s){if(!s.removes||!s.tray.length||s.shelf.length||s.status==='won')return false;s.shelf=s.tray.splice(0,3);s.removes--;s.status='playing';s.history=[];return true;}
+  function shuffle(s,random=Math.random){if(!s.shuffles||s.status!=='playing')return false;const left=s.tiles.filter(t=>!t.removed),kinds=left.map(t=>t.kind);for(let i=kinds.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[kinds[i],kinds[j]]=[kinds[j],kinds[i]];}left.forEach((t,i)=>t.kind=kinds[i]);s.shuffles--;s.history=[];return true;}
+  return {icons,free,fresh,pick,undo,remove,shuffle};
+});

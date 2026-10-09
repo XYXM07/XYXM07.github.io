@@ -12,7 +12,7 @@
   const tileCount=tier=>[9,9,24,8][tier];
   const bingoRect=i=>({x:36+(i%5)*50,y:142+Math.floor(i/5)*50,w:48,h:48});
   const rect=(i,tier=0)=>tier===0?{x:34+(i%3)*166,y:118+Math.floor(i/3)*104,w:154,h:90}:tier===2?{x:350+(i%4)*86,y:123+Math.floor(i/4)*49,w:78,h:40}:tier===3?{x:34+(i%4)*166,y:118+Math.floor(i/4)*62,w:154,h:50}:{x:34+(i%3)*222,y:118+Math.floor(i/3)*104,w:208,h:90};
-  function fresh(){return {version:4,coins:80,best:80,earned:0,lifetime:0,cards:0,discarded:0,levels:{brush:0},selected:0,current:null,activity:'lottery',dish:null,dishes:0};}
+  function fresh(){return {version:4,coins:10000,best:10000,earned:0,lifetime:0,cards:0,discarded:0,levels:{brush:0},selected:0,current:null,activity:'lottery',dish:null,dishes:0};}
   const DISH_GRID=64,DISH_RECT={x:220,y:125,w:280,h:280},DISH_POINTS=[];
   for(let y=0;y<DISH_GRID;y++)for(let x=0;x<DISH_GRID;x++){const px=DISH_RECT.x+(x+.5)*DISH_RECT.w/DISH_GRID,py=DISH_RECT.y+(y+.5)*DISH_RECT.h/DISH_GRID;if(Math.hypot(px-360,py-265)<=140)DISH_POINTS.push({index:y*DISH_GRID+x,x:px,y:py});}
   const DISH_THRESHOLD=Math.ceil(DISH_POINTS.length*.985),DISH_INDICES=new Set(DISH_POINTS.map(p=>p.index));

@@ -178,7 +178,7 @@
   function confirmation(action,text){pause();confirmAction=action;$('#scratch-confirm-text').textContent=text;$('#scratch-confirm').hidden=false;update();$('#scratch-confirm-yes').focus({preventScroll:true});$('#scratch-confirm').scrollIntoView({block:'nearest',behavior:reduce.matches?'auto':'smooth'});}
   $('#scratch-reset').onclick=()=>confirmation('reset','确认重置本次刮刮乐进度？金币、升级、票卡和刷盘子进度都会重新开始，其他小游戏的本次进度不受影响。');
   $('#scratch-confirm-no').onclick=()=>{confirmAction=null;$('#scratch-confirm').hidden=true;update();$('#scratch-reset').focus({preventScroll:true});};
-  $('#scratch-confirm-yes').onclick=()=>{if(confirmAction!=='reset')return;state=L.fresh();status('已重置星愿刮刮乐，80 金币的新旅程开始了。');confirmAction=null;$('#scratch-confirm').hidden=true;coatingCard=null;dishCard=null;particles=[];changed();$('#scratch-buy').focus({preventScroll:true});};
+  $('#scratch-confirm-yes').onclick=()=>{if(confirmAction!=='reset')return;state=L.fresh();status('已重置星愿刮刮乐，10000 金币的新旅程开始了。');confirmAction=null;$('#scratch-confirm').hidden=true;coatingCard=null;dishCard=null;particles=[];changed();$('#scratch-buy').focus({preventScroll:true});};
   function visibility(){if(!active())pause();else{dirty=true;lastTime=0;schedule();}}
   document.addEventListener('site:pagechange',visibility);document.addEventListener('hub:selection',()=>queueMicrotask(visibility));document.addEventListener('visibilitychange',visibility);window.addEventListener('pagehide',pause);
   update();draw();if(isDish())status(!state.dish?'领取一个脏盘子，洗净后获得 10 金币。':state.dish.finished?'已恢复洗净的盘子，奖励已领取，可以再免费领一个。':'已恢复未刷完的盘子，继续擦洗。');else if(state.current)status(state.current.finished?'已恢复上次结算的票卡，可以购入下一张。':'已恢复未刮完的票卡，继续拖动刮开涂层。');
