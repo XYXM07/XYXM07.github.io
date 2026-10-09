@@ -1,0 +1,16 @@
+{
+  "bytes": 32232419,
+  "sha256": "9f57947a5bd530d8f00c5b3f2cb2a3492faa7e5d823315342d6a8656d0a6b7b7",
+  "parts": [
+    {
+      "name": "ffmpeg-core.part-1.wasm",
+      "bytes": 16777216,
+      "sha256": "4ccba0c9cc7f019751a958ead3918cf51c9563ff2f8a76fb1f72ae492f66693b"
+    },
+    {
+      "name": "ffmpeg-core.part-2.wasm",
+      "bytes": 15455203,
+      "sha256": "80e8b2ae7994e92102e048249ab0a6673480ca626c359b1d321b24f105f02e65"
+    }
+  ]
+}

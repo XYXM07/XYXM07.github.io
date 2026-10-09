@@ -27,7 +27,7 @@
     try{
       if(!window.Worker||!window.WebAssembly)throw Error('当前浏览器不支持音频转换，请使用新版浏览器');
       const bytes=new Uint8Array(await s.file.arrayBuffer());if(id!==job)return;
-      if(!worker)worker=new Worker('audio-convert-worker.js?v=113e4b91f2b0');
+      if(!worker)worker=new Worker('audio-convert-worker.js?v=1d0c3994f124');
       worker.onmessage=({data})=>{
         if(data.id!==job)return;
         if(data.type==='loading'){status.textContent='正在加载本地转换组件，首次需要下载约 31 MB…';}

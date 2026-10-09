@@ -10,3 +10,8 @@ FFmpeg source: https://github.com/FFmpeg/FFmpeg/tree/n5.1.4
 Only loaded by audio-convert-worker.js on an explicit conversion request.
 Input/output files remain in worker memory. No SharedArrayBuffer or custom
 COOP/COEP headers are required; this build works with static GitHub Pages.
+
+The original WASM binary is split into 16 MiB chunks for Cloudflare Pages'
+25 MiB per-asset limit. The worker verifies SHA-256, assembles the identical
+binary in memory, and passes wasmBinary to the unmodified upstream runtime.
+ffmpeg-core.manifest.json records the original and per-chunk checksums.
