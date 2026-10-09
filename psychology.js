@@ -3,7 +3,7 @@
   const A=window.AssessmentLogic,$=s=>document.querySelector(s),sessions=new Map();
   const supportText='这项回答值得认真对待。建议尽快与可信任的人或心理健康专业人员联系；如果你现在可能伤害自己，请立即联系当地急救或前往急诊，不要独自等待。';
   let kind=null,session=null;
-  function supportItem(index,value){return value>0&&((kind==='phq9'&&index===8)||(kind==='cesdr'&&[13,14].includes(index))||(kind==='hamd'&&index===2));}
+  function supportItem(index,value){return value>0&&((kind==='phq9'&&index===8)||(kind==='cesdr'&&[13,14].includes(index))||(kind==='hamd'&&index===2))||kind==='sds'&&index===18&&value>1;}
   function node(tag,text,className){const el=document.createElement(tag);if(text!=null)el.textContent=text;if(className)el.className=className;return el;}
   function focusArea(el){el.tabIndex=-1;el.focus({preventScroll:true});if(el.getBoundingClientRect().top<70||el.getBoundingClientRect().top>innerHeight*.55)el.scrollIntoView({block:'start',behavior:'instant'});}
   function source(parent){const t=A.tests[kind],links=node('div',null,'assessment-sources');t.sources.forEach(([label,url])=>{const a=node('a',label);a.href=url;a.target='_blank';a.rel='noopener noreferrer';links.append(a);});parent.append(links);if(t.license)parent.append(node('p',t.license,'assessment-license'));}
@@ -12,7 +12,7 @@
     const t=A.tests[kind],box=$('#assessment-intro');box.replaceChildren(node('h2',t.title),node('p',t.description));
     if(t.mode==='external'){source(box);const links=node('div',null,'play-actions');for(const id of kind==='mbti'?['ipip','holland']:['phq9','gad7','who5']){const a=node('a',A.tests[id].title,'button secondary');a.href='#psychology/'+id;links.append(a);}box.append(links);return;}
     const meta=node('div',null,'assessment-meta');meta.append(node('span',t.count+' 项'),node('span',t.period),node('span','本机计分 · 不上传答案'));box.append(meta,node('p','答题没有对错。可以返回修改；刷新页面会清空答案。','help-note'));
-    if(['phq9','gad7','who5','cesd','cesdr','hamd'].includes(kind))box.append(node('p',t.clinician?'此页面是专业评定记录工具。受评者不应自行选择访谈观察等级；请由合格专业人员填写和解读。':'用于了解近期状态，结果不能诊断疾病。正式评估需结合专业人员的判断。','assessment-note'));
+    if(['phq9','gad7','who5','cesd','cesdr','hamd','sds','sas','pss'].includes(kind))box.append(node('p',t.clinician?'此页面是专业评定记录工具。受评者不应自行选择访谈观察等级；请由合格专业人员填写和解读。':'用于了解近期状态，结果不能诊断疾病。正式评估需结合专业人员的判断。','assessment-note'));
     const start=node('button',session.started?'继续答题':t.clinician?'填写评定记录':'开始答题','button primary');start.type='button';start.addEventListener('click',()=>{session.started=true;view();focusArea($('#assessment-quiz'));});box.append(start);
     const details=node('details',null,'assessment-extra');details.append(node('summary','题目来源与计分方法'),node('p',t.method));source(details);box.append(details);
   }
@@ -47,9 +47,12 @@
     }else if(kind==='who5'){
       const summary=node('div',null,'screening-summary');summary.append(node('strong','分数 '+score.percent),node('span','原始分 '+score.total));box.append(summary,node('p','分数越高，表示过去两周的幸福感越好。百分制分数不是人群百分位。'));
       box.append(node('p',score.further?'原版建议进一步评估：原始分低于 13，或至少一项为 0–1 分。可以与心理健康专业人员讨论近期感受。':'本次回答未达到原版进一步评估提示条件；这一结果不能排除其他困扰。','assessment-note'));
+    }else if(kind==='pss'){
+      const summary=node('div',null,'screening-summary');summary.append(node('strong','分数 '+score.total),node('span','感知压力得分'));box.append(summary,node('p','分数越高，表示过去一个月感受到的压力越大。原作者没有诊断分界值，不能凭此分数判断是否患病，也不提供高、中、低压力等级。','assessment-note'));
     }else{
       const summary=node('div',null,'screening-summary');summary.append(node('strong','分数 '+score.total),node('span',score.severity+(kind==='phq9'||kind==='gad7'?'症状范围':'')));box.append(summary,node('p',t.clinician?'此总分属于专业访谈评定记录，需由合格专业人员结合完整访谈解释。':'这是症状筛查得分，不是诊断结论。'));
-      if(score.further)box.append(node('p','达到原作者建议进一步评估的分数范围。若症状持续或影响生活，建议联系心理健康专业人员。','assessment-note'));
+      if(Number.isFinite(score.raw))summary.append(node('span','原始分 '+score.raw));
+      if(score.further)box.append(node('p','达到该量表的进一步评估参考分数。若症状持续或影响生活，建议联系心理健康专业人员。','assessment-note'));
       if(kind==='phq9'&&Number.isInteger(session.impact))box.append(node('p','你报告的功能影响：'+['没有困难','有些困难','非常困难','极其困难'][session.impact]+'（不计入总分）。'));
       if(score.support)support(box);
     }

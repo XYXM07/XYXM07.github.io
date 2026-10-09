@@ -1,19 +1,22 @@
 (() => {
   'use strict';const $=s=>document.querySelector(s),L=window.StudioLogic;
   function download(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}
-  const player=$('#audio-player'),wave=$('#audio-wave'),ctx=wave.getContext('2d');let buffer=null,audioURL=null,audioContext=null,peaks=[],loadId=0,previewEnd=null,drag=null,audioName='音频';
+  const player=$('#audio-player'),wave=$('#audio-wave'),ctx=wave.getContext('2d');let buffer=null,audioURL=null,audioContext=null,peaks=[],loadId=0,previewEnd=null,drag=null,audioName='音频',sourceFile=null,sourceLoading=false;
+  window.AudioStudio={getSource:()=>({file:sourceFile,name:audioName,duration:buffer?.duration??null,loading:sourceLoading,range:range()})};
+  function sourceChanged(){document.dispatchEvent(new CustomEvent('audio:source'));}
   const status=text=>$('#audio-status').textContent=text;
   function range(){return {start:Number($('#audio-start').value),end:Number($('#audio-end').value)};}
   function setRange(start,end){if(!buffer)return;start=Math.max(0,Math.min(buffer.duration,start));end=Math.max(0,Math.min(buffer.duration,end));$('#audio-start').value=start.toFixed(2);$('#audio-end').value=end.toFixed(2);drawWave();}
   function drawWave(){ctx.clearRect(0,0,wave.width,wave.height);ctx.fillStyle='#102c39';ctx.fillRect(0,0,wave.width,wave.height);if(!buffer)return;const {start,end}=range(),w=wave.width,h=wave.height;ctx.fillStyle='#c8e8de20';ctx.fillRect(start/buffer.duration*w,0,(end-start)/buffer.duration*w,h);ctx.strokeStyle='#ccebdc';ctx.lineWidth=1.2;ctx.beginPath();peaks.forEach((p,i)=>{const x=i/peaks.length*w;ctx.moveTo(x,h/2-p.max*h*.43);ctx.lineTo(x,h/2-p.min*h*.43);});ctx.stroke();ctx.strokeStyle='#d9f3e0';ctx.lineWidth=2;for(const x of [start,end].map(s=>s/buffer.duration*w)){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();}ctx.strokeStyle='#efcd8f';ctx.lineWidth=2;const play=player.currentTime/buffer.duration*w;ctx.beginPath();ctx.moveTo(play,0);ctx.lineTo(play,h);ctx.stroke();}
   function audioEnabled(enabled){['audio-start','audio-end','audio-preview','audio-full','audio-export'].forEach(id=>document.getElementById(id).disabled=!enabled);}
   $('#audio-file').addEventListener('change',async e=>{
-    const file=e.target.files[0];if(!file)return;const id=++loadId;player.pause();previewEnd=null;audioEnabled(false);status('正在解码音频…');
+    const file=e.target.files[0];if(!file)return;const id=++loadId;player.pause();if(audioURL)URL.revokeObjectURL(audioURL);audioURL=null;player.removeAttribute('src');player.load();$('#audio-file-name').textContent=file.name;$('#audio-empty').hidden=false;previewEnd=null;buffer=null;peaks=[];drag=null;sourceFile=file;audioName=file.name.replace(/\.[^.]*$/,'');sourceLoading=true;audioEnabled(false);drawWave();sourceChanged();status('正在解码音频…');
     try{if(file.size>80*1024*1024)throw Error('文件超过 80 MB，请选择较小音频');const Context=window.AudioContext||window.webkitAudioContext;if(!Context)throw Error('当前浏览器不支持音频解码');if(!audioContext)audioContext=new Context();const decoded=await audioContext.decodeAudioData(await file.arrayBuffer());if(id!==loadId)return;if(decoded.length*decoded.numberOfChannels*4>180*1024*1024||decoded.duration>900)throw Error('音频过长或解码数据过大，请选择 15 分钟以内的片段');
       buffer=decoded;audioName=file.name.replace(/\.[^.]*$/,'');if(audioURL)URL.revokeObjectURL(audioURL);audioURL=URL.createObjectURL(file);player.src=audioURL;$('#audio-file-name').textContent=file.name;$('#audio-empty').hidden=true;
       const samples=buffer.getChannelData(0),bins=Math.min(1200,samples.length),step=samples.length/bins;peaks=Array.from({length:bins},(_,i)=>{let min=1,max=-1;for(let j=Math.floor(i*step);j<Math.floor((i+1)*step);j++){min=Math.min(min,samples[j]);max=Math.max(max,samples[j]);}return {min,max};});
       $('#audio-start').max=buffer.duration;$('#audio-end').max=buffer.duration;audioEnabled(true);setRange(0,buffer.duration);status('时长 '+buffer.duration.toFixed(2)+' 秒 · '+buffer.sampleRate+' Hz · '+buffer.numberOfChannels+' 声道。拖动波形选择片段。');
-    }catch(err){if(id!==loadId)return;buffer=null;peaks=[];if(audioURL)URL.revokeObjectURL(audioURL);audioURL=null;player.removeAttribute('src');player.load();$('#audio-empty').hidden=false;$('#audio-file-name').textContent='解码失败';drawWave();status(err.message||'无法解码此音频格式');}
+    }catch(err){if(id!==loadId)return;buffer=null;peaks=[];if(file.size>80*1024*1024||/音频过长|解码数据过大/.test(err.message))sourceFile=null;if(audioURL)URL.revokeObjectURL(audioURL);audioURL=null;player.removeAttribute('src');player.load();$('#audio-empty').hidden=false;$('#audio-file-name').textContent=file.name;drawWave();status(sourceFile?'播放器无法预览此文件，可以尝试下方的整段格式转换。':err.message||'无法解码此音频格式');}
+    finally{if(id===loadId){sourceLoading=false;sourceChanged();}}
   });
   ['audio-start','audio-end'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{previewEnd=null;drawWave();}));
   $('#audio-full').onclick=()=>{previewEnd=null;setRange(0,buffer.duration);};

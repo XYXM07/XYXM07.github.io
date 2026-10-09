@@ -11,7 +11,7 @@
     const aligned=onsets.filter(p=>Math.abs(((p.time-phase+period/2)%period+period)%period-period/2)<period*.15);if(aligned.length){const residual=median(aligned.map(p=>((p.time-phase+period/2)%period+period)%period-period/2));phase=((phase+residual)%period+period)%period;}
     const segments=[];for(let start=0;start<samples.length/rate;start+=12){const local=onsets.filter(p=>p.time>=start&&p.time<start+12),intervals=[];for(let i=1;i<local.length;i++){const gap=local[i].time-local[i-1].time,k=Math.round(gap/period);if(k>0&&Math.abs(gap/k-period)<period*.15)intervals.push(gap/k);}if(intervals.length>=5)segments.push({start,bpm:60/median(intervals)});}
     const speeds=segments.map(s=>s.bpm),variable=speeds.length>1&&(Math.max(...speeds)-Math.min(...speeds))/bpm>.025;
-    return {offset:phase*1000,offsetConfidence:Math.hypot(cos,sin)/(total||1),variable,segments};
+    return {offset:phase*1000,offsetConfidence:Math.hypot(cos,sin)/(total||1),variable,segments,_onsets:onsets};
   }
   function analyze(samples,rate){
     if(!samples||samples.length<rate*6)throw Error('请使用至少 6 秒的音频。');const n=1024,hop=128,hz=rate/hop,count=Math.floor((samples.length-n)/hop),flux=new Float64Array(count),previous=new Float64Array(n/2),re=new Float64Array(n),im=new Float64Array(n),window=Float64Array.from({length:n},(_,i)=>.5-.5*Math.cos(2*Math.PI*i/(n-1)));let peak=0;
@@ -27,5 +27,21 @@
     candidates.sort((a,b)=>b.score-a.score);if(!candidates.length||candidates[0].score<.08)throw Error('节奏不够稳定，建议使用手动敲击测速。');const top=candidates[0].score,near=candidates.filter(c=>c.score>=top*.92);near.sort((a,b)=>b.bpm-a.bpm);const best=near[0],alternatives=[best,...candidates].filter((v,i,a)=>a.findIndex(o=>Math.abs(o.bpm-v.bpm)<1)===i).slice(0,4);
     return {bpm:best.bpm,confidence:Math.max(0,Math.min(1,best.score)),candidates:alternatives.map(c=>({bpm:c.bpm,score:c.score})),beats:peaks.length,duration:samples.length/rate,...alignment(samples,rate,peaks,best.bpm)};
   }
-  return {analyze,taps,gridTimes};
+  function analyzeTrack(samples,rate){
+    const duration=samples.length/rate,base=analyze(samples.subarray(0,Math.min(samples.length,rate*180)),rate),windows=[];
+    for(let start=0;start<=duration-6;start+=4){const end=Math.min(duration,start+8);try{const r=analyze(samples.subarray(Math.round(start*rate),Math.round(end*rate)),rate);windows.push({center:(start+end)/2,start,end,...r});}catch{windows.push({center:(start+end)/2,start,end,bpm:null,confidence:0,_onsets:[]});}}
+    if(!windows.length)return {...base,segments:[{start:0,end:duration,bpm:base.bpm,offset:base.offset,confidence:base.confidence}],variable:false};
+    const close=(a,b)=>Math.abs(a-b)/Math.min(a,b)<.03;
+    for(let i=1;i<windows.length-1;i++){const a=windows[i-1],b=windows[i],c=windows[i+1];if(a.bpm&&b.bpm&&c.bpm&&close(a.bpm,c.bpm)&&!close(a.bpm,b.bpm)){b.bpm=(a.bpm+c.bpm)/2;b.confidence=Math.min(a.confidence,c.confidence);}}
+    const groups=[];let lastBpm=base.bpm;
+    for(let i=0;i<windows.length;i++){const row=windows[i],bpm=row.bpm||lastBpm,start=i===0?0:(windows[i-1].center+row.center)/2,end=i===windows.length-1?duration:(row.center+windows[i+1].center)/2,prev=groups.at(-1);if(prev&&close(prev.bpm,bpm)){prev.end=end;prev.values.push(bpm);prev.bpm=median(prev.values);prev.confidence=Math.min(prev.confidence,row.confidence);}else groups.push({start,end,bpm,confidence:row.confidence,values:[bpm]});lastBpm=bpm;}
+    const onsets=windows.flatMap(w=>w._onsets.map(p=>p.time+w.start)).sort((a,b)=>a-b).filter((t,i,a)=>!i||t-a[i-1]>.05);
+    // Refine a change boundary from inter-onset timing instead of snapping it to a window edge.
+    for(let g=1;g<groups.length;g++){const left=groups[g-1],right=groups[g],boundary=right.start,local=onsets.filter(t=>t>=Math.max(left.start,boundary-6)&&t<=Math.min(right.end,boundary+6)),intervals=local.slice(1).map((t,i)=>({start:local[i],gap:t-local[i]})).filter(p=>p.gap>.16&&p.gap<1.6);let best=Infinity,cut=boundary;for(let split=2;split<intervals.length-2;split++){const candidate=intervals[split].start;if(Math.abs(candidate-boundary)>5)continue;let loss=0;for(let j=0;j<intervals.length;j++){const period=60/(j<split?left.bpm:right.bpm);loss+=Math.min(1,Math.abs(intervals[j].gap-period)/period);}loss+=Math.abs(candidate-boundary)*.002;if(loss<best){best=loss;cut=candidate;}}if(cut>left.start+4&&cut<right.end-4){left.end=right.start=cut;}}
+    const segments=groups.map(g=>{const start=g.start,end=g.end;let bpm=g.bpm,offset=0,confidence=g.confidence;try{const local=analyze(samples.subarray(Math.round(start*rate),Math.round(Math.min(end,start+90)*rate)),rate);if(close(local.bpm,bpm))bpm=local.bpm;const phase=alignment(samples.subarray(Math.round(start*rate),Math.round(Math.min(end,start+90)*rate)),rate,local._onsets.map(p=>({time:p.time-.04,weight:p.weight})),bpm);offset=phase.offset;confidence=Math.min(confidence,local.confidence);}catch{confidence=0;}return {start,end,bpm,offset,confidence};});
+    const variable=segments.length>1;delete base._onsets;return {...base,duration,variable,segments,bpm:variable?base.bpm:segments[0].bpm,offset:variable?base.offset:segments[0].offset};
+  }
+  function segmentedGridTimes(segments,start,end){const points=[];segments.forEach((s,segmentIndex)=>{const a=Math.max(start,s.start),b=Math.min(end,s.end);if(b<=a)return;for(const p of gridTimes(s.bpm,s.start*1000+s.offset,a,b)){if(p.time<s.end-1e-7||segmentIndex===segments.length-1)points.push({...p,segmentIndex});}});return points.sort((a,b)=>a.time-b.time);}
+  function clickSamples(rate,accent=false){const out=new Float32Array(Math.ceil(rate*.09)),frequency=accent?1350:950;for(let i=0;i<out.length;i++){const t=i/rate,attack=Math.min(1,t/.0015),envelope=attack*Math.exp(-t*55)*(1-t/.09);out[i]=.9*envelope*(Math.sin(2*Math.PI*frequency*t)*.8+Math.sin(2*Math.PI*frequency*2.05*t)*.2);}return out;}
+  return {analyze,analyzeTrack,taps,gridTimes,segmentedGridTimes,clickSamples};
 });
