@@ -2,15 +2,21 @@
   'use strict';
   const types={bar:'柱状图',horizontal:'条形图',line:'折线图',area:'面积图',stacked:'堆叠柱状图',pie:'饼图',donut:'环形图',scatter:'散点图',radar:'雷达图'};
   const palettes={ocean:['#8cc9c0','#e6c38b','#96b8df','#d8a39b','#b9c98e','#d2c8ba'],sunset:['#e7a589','#edcb93','#a9cfbd','#97bed4','#cfaaa3','#d2d69a'],forest:['#8fc5aa','#cad69d','#d7bd88','#8db6b5','#c5b4a0','#a6c9ca']};
+  const color=value=>{if(typeof value!=='string'||!/^#[0-9a-f]{6}$/i.test(value))throw Error('颜色请使用 #RRGGBB 格式');return value.toLowerCase();};
+  function contrastInk(background){const luminance=value=>{const rgb=color(value).slice(1).match(/../g).map(v=>{const n=parseInt(v,16)/255;return n<=.04045?n/12.92:Math.pow((n+.055)/1.055,2.4);});return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722;},bg=luminance(background),ratio=value=>(Math.max(bg,value)+.05)/(Math.min(bg,value)+.05);return ratio(luminance('#192e35'))>=ratio(luminance('#e5eee6'))?'#192e35':'#e5eee6';}
+  function blend(a,b,amount){const aa=color(a).slice(1).match(/../g).map(v=>parseInt(v,16)),bb=color(b).slice(1).match(/../g).map(v=>parseInt(v,16));return '#'+aa.map((v,i)=>Math.round(v*(1-amount)+bb[i]*amount).toString(16).padStart(2,'0')).join('');}
+  function example(type='bar'){if(!types[type])throw Error('请选择有效图表类型');return (type==='scatter'?'X':'类别')+',系列 A,系列 B\n1,120,35\n2,180,65\n3,155,48\n4,260,92\n5,320,125';}
   function csv(text){if(text.length>200000)throw Error('数据请控制在 20 万字符以内');const rows=[];let row=[],cell='',quote=false;for(let i=0;i<text.length;i++){const c=text[i];if(c==='"'){if(quote&&text[i+1]==='"'){cell+='"';i++;}else if(quote||!cell)quote=!quote;else throw Error('CSV 引号位置不正确');}else if(c===','&&!quote){row.push(cell.trim());cell='';}else if((c==='\n'||c==='\r')&&!quote){if(c==='\r'&&text[i+1]==='\n')i++;row.push(cell.trim());if(row.some(Boolean))rows.push(row);row=[];cell='';}else cell+=c;}if(quote)throw Error('CSV 引号未闭合');row.push(cell.trim());if(row.some(Boolean))rows.push(row);return rows;}
   function parse(text){const rows=csv(text);if(rows.length<2)throw Error('需要一行表头和至少一行数据');const header=rows.shift();if(header.length<2||header.length>7)throw Error('第一列为类别，其后支持 1–6 个数据系列');if(rows.length>50)throw Error('最多支持 50 行数据');if(header.some(s=>!s||s.length>80))throw Error('表头不能为空或超过 80 字');const values=rows.map((row,i)=>{if(row.length!==header.length||!row[0]||row[0].length>80)throw Error('第 '+(i+2)+' 行列数或类别名称不正确');return row.slice(1).map(v=>{if(!v.trim()||!Number.isFinite(Number(v))||Math.abs(Number(v))>1e12)throw Error('第 '+(i+2)+' 行含有无效数值');return Number(v);});});return {label:header[0],series:header.slice(1),labels:rows.map(r=>r[0]),values};}
   const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
   const num=n=>Math.round(n*100)/100,short=s=>s.length>12?s.slice(0,11)+'…':s;
-  function svg(data,{type='bar',title='我的图表',palette='ocean',dark=true,legend=true}={}){
-    if(!types[type]||!palettes[palette])throw Error('请选择有效图表类型和配色');const colors=palettes[palette],ink=dark?'#e5eee6':'#192e35',muted=dark?'#a9bbb9':'#53676b',grid=dark?'#3f585e':'#dbe4e4',bg=dark?'#17333d':'#ffffff',parts=[];
-    const text=(x,y,s,size=14,anchor='middle',fill=muted)=>parts.push(`<text x="${num(x)}" y="${num(y)}" font-size="${size}" text-anchor="${anchor}" fill="${fill}">${escape(s)}</text>`);
+  function svg(data,{type='bar',title='我的图表',palette='ocean',dark=true,legend=true,colors:customColors,background,foreground}={}){
+    if(!types[type]||(!Array.isArray(palettes[palette])&&palette!=='custom'))throw Error('请选择有效图表类型和配色');
+    const selected=customColors??palettes[palette];if(!Array.isArray(selected)||!selected.length||selected.length>18)throw Error('请设置 1–18 个配色');
+    const colors=selected.map(color),bg=background===undefined?(dark?'#17333d':'#ffffff'):color(background),ink=foreground===undefined?contrastInk(bg):color(foreground),muted=blend(bg,ink,.7),grid=blend(bg,ink,.2),parts=[];
+    const text=(x,y,s,size=14,anchor='middle',fill=muted)=>parts.push(`<text x="${num(x)}" y="${num(y)}" font-size="${size}" font-weight="400" stroke="none" text-anchor="${anchor}" fill="${fill}">${escape(s)}</text>`);
     const line=(x1,y1,x2,y2,stroke=grid)=>parts.push(`<path d="M${num(x1)} ${num(y1)}L${num(x2)} ${num(y2)}" fill="none" stroke="${stroke}"/>`);
-    parts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="640" viewBox="0 0 1000 640" role="img" aria-labelledby="chart-title" style="font-family:system-ui,'Microsoft YaHei',sans-serif"><title id="chart-title">${escape(title||types[type])}</title><rect width="1000" height="640" rx="20" fill="${bg}"/>`);text(500,48,title||types[type],26,'middle',ink);
+    parts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="640" viewBox="0 0 1000 640" role="img" aria-labelledby="chart-title" style="font-family:system-ui,'Microsoft YaHei',sans-serif;font-weight:400;stroke:none;stroke-width:1;fill:none"><title id="chart-title">${escape(title||types[type])}</title><rect width="1000" height="640" rx="20" fill="${bg}" stroke="none"/>`);text(500,48,title||types[type],26,'middle',ink);
     const left=90,right=930,top=105,bottom=510,w=right-left,h=bottom-top,n=data.labels.length,m=data.series.length,all=data.values.flat();
     let min=Math.min(0,...all),max=Math.max(0,...all);if(type==='stacked'){min=Math.min(0,...data.values.map(v=>v.filter(x=>x<0).reduce((s,x)=>s+x,0)));max=Math.max(0,...data.values.map(v=>v.filter(x=>x>0).reduce((s,x)=>s+x,0)));}if(max===min)max=min+1;
     const y=v=>bottom-(v-min)/(max-min)*h,x=i=>left+(i+.5)*w/n;
@@ -29,7 +35,7 @@
     }else{
       for(let q=0;q<=5;q++){const value=min+(max-min)*q/5;line(left,y(value),right,y(value));text(left-12,y(value)+4,num(value),12,'end');}line(left,y(0),right,y(0),muted);
       if(type==='scatter'){
-        const xs=data.labels.map(Number);if(xs.some((v,i)=>!data.labels[i].trim()||!Number.isFinite(v)))throw Error('散点图的第一列必须为数字 X 坐标');const lo=Math.min(...xs),hi=Math.max(...xs),xx=v=>left+(v-lo)/(hi-lo||1)*w;
+        const xs=data.labels.map(Number);if(xs.some((v,i)=>!data.labels[i].trim()||!Number.isFinite(v)||Math.abs(v)>1e12))throw Error('散点图的第一列必须为有效数字 X 坐标');let lo=Math.min(...xs),hi=Math.max(...xs);if(lo===hi){const padding=Math.max(1,Math.abs(lo)*.05);lo-=padding;hi+=padding;}const xx=v=>left+(v-lo)/(hi-lo)*w;
         for(let q=0;q<=5;q++){const v=lo+(hi-lo)*q/5;line(xx(v),top,xx(v),bottom);text(xx(v),bottom+25,num(v),12);}data.series.forEach((_,j)=>data.values.forEach((row,i)=>parts.push(`<circle cx="${num(xx(xs[i]))}" cy="${num(y(row[j]))}" r="5" fill="${colors[j]}" fill-opacity=".85"/>`)));
       }else{
         data.labels.forEach((s,i)=>{if(n<=16||i%Math.ceil(n/16)===0)text(x(i),bottom+26,short(s),12);});
@@ -41,5 +47,5 @@
     }
     if(legend&&!['pie','donut'].includes(type)){let xx=65;data.series.forEach((name,j)=>{rect(xx,591,12,12,colors[j]);text(xx+20,602,short(name),13,'start');xx+=150;});}parts.push('</svg>');return parts.join('');
   }
-  const api={types,palettes,parse,svg};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.ChartLogic=api;
+  const api={types,palettes,parse,svg,color,contrastInk,example};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.ChartLogic=api;
 })(typeof window!=='undefined'?window:globalThis);

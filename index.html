@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#183544">
   <meta name="description" content="星月晓梦的个人站，小游戏、常用工具与联系方式。">
   <title>星月晓梦的个人站</title>
@@ -50,7 +50,7 @@
   <script src="audio-converter.js?v=992cc5f2444d" defer></script>
   <script src="diagram-studio.js" defer></script>
   <script src="daily-studio.js" defer></script>
-  <script src="selects.js" defer></script>
+  <script src="selects.js?v=33f3526d1015" defer></script>
   <script src="vendor/matter.min.js" defer></script>
   <script src="vendor/js-yaml.min.js" defer></script>
   <script src="vendor/pdf-lib.min.js" defer></script>
@@ -84,13 +84,15 @@
   <script src="tower-logic.js?v=b4f8d7cdacf9" defer></script>
   <script src="tower-game.js?v=3444182d7a25" defer></script>
   <link rel="stylesheet" href="audio-converter.css?v=00c235cc1fe5">
-  <link rel="stylesheet" href="october-tools.css?v=ed87b52e0b84">
-  <script src="chart-logic.js?v=10c2190255d7" defer></script>
-  <script src="chart-maker.js?v=7a3f281c3562" defer></script>
+  <link rel="stylesheet" href="october-tools.css?v=17fb1c31a8a4">
+  <script src="chart-logic.js?v=e5b085783b2e" defer></script>
+  <script src="chart-maker.js?v=cdaf6a6c5234" defer></script>
   <script src="image-edit-logic.js?v=222d2180880f" defer></script>
   <script src="image-editor.js?v=a993a38d15e5" defer></script>
   <script src="video-logic.js?v=b80bc247a4c1" defer></script>
   <script src="video-tool.js?v=963167831168" defer></script>
+  <link rel="stylesheet" href="mobile.css?v=e1cc37bc2db6">
+  <script src="mobile-layout.js?v=eb88ba75f604" defer></script>
 </head>
 <body>
   <svg class="icon-library" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs>
@@ -129,7 +131,7 @@
 
     </aside>
     <main class="main">
-      <header class="topbar"><div class="topbar-navigation"><button class="page-back" id="page-back" type="button" aria-label="返回上一页面" hidden>返回</button><div class="breadcrumb">PERSONAL SPACE <span>/</span> <strong id="page-label">首页</strong></div></div><div class="topbar-right"><button id="site-search-open" class="site-search-button" type="button" aria-label="搜索工具和游戏"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/></svg>搜索</button><button class="motion-toggle" id="motion-toggle" type="button" aria-pressed="false" hidden>开启重力感应</button><span class="hello-status"><i></i> 很高兴遇见你</span><span class="date" id="today"></span></div></header>
+      <header class="topbar"><div class="topbar-navigation"><button class="page-back" id="page-back" type="button" aria-label="返回上一页面" hidden>返回</button><div class="breadcrumb"><span class="breadcrumb-kicker">PERSONAL SPACE</span> <span class="breadcrumb-divider">/</span> <strong id="page-label">首页</strong></div></div><div class="topbar-right"><button id="site-search-open" class="site-search-button" type="button" aria-label="搜索工具和游戏"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/></svg>搜索</button><button class="motion-toggle" id="motion-toggle" type="button" aria-pressed="false" hidden>开启重力感应</button><span class="hello-status"><i></i> 很高兴遇见你</span><span class="date" id="today"></span></div></header>
       <div class="page-container" id="page-container">
         <section class="page active home-page" id="page-home" aria-labelledby="home-title">
           <div class="hero">
@@ -272,8 +274,9 @@
 <section class="tool-panel" id="tool-chart" hidden aria-label="图表创建器">
   <div class="tool-heading"><h2>图表创建器</h2><p>把数字变成清晰的图表，支持多个数据系列与 SVG、高清 PNG 导出。</p></div>
   <div class="enhanced-grid"><div class="enhanced-controls">
-    <label class="field-label" for="chart-name">图表标题</label><input id="chart-name" maxlength="80" value="每月的小小进展">
-    <div class="form-grid"><label>图表类型<select id="chart-type"><option value="bar">柱状图</option><option value="horizontal">条形图</option><option value="line">折线图</option><option value="area">面积图</option><option value="stacked">堆叠柱状图</option><option value="pie">饼图</option><option value="donut">环形图</option><option value="scatter">散点图</option><option value="radar">雷达图</option></select></label><label>配色<select id="chart-palette"><option value="ocean">海风与星光</option><option value="sunset">日落余温</option><option value="forest">林间晨露</option></select></label><label>导出背景<select id="chart-background"><option value="dark">深色画布</option><option value="white">白色画布</option></select></label><label class="check-field"><input type="checkbox" id="chart-legend" checked>显示图例</label></div>
+    <label class="field-label" for="chart-name">图表标题</label><input id="chart-name" maxlength="80" value="数据对比示例">
+    <div class="form-grid"><label>图表类型<select id="chart-type"><option value="bar">柱状图</option><option value="horizontal">条形图</option><option value="line">折线图</option><option value="area">面积图</option><option value="stacked">堆叠柱状图</option><option value="pie">饼图</option><option value="donut">环形图</option><option value="scatter">散点图</option><option value="radar">雷达图</option></select></label><label>配色<select id="chart-palette"><option value="ocean">海风与星光</option><option value="sunset">日落余温</option><option value="forest">林间晨露</option><option value="custom">自定义配色</option></select></label><label>画布背景<select id="chart-background"><option value="dark">深色画布</option><option value="white">白色画布</option><option value="custom">自定义画布</option></select></label><label class="check-field"><input type="checkbox" id="chart-legend" checked>显示图例</label></div>
+    <details class="chart-colors" open><summary>自定义颜色</summary><div class="chart-color-grid"><label class="chart-color-field"><span>画布颜色</span><input id="chart-canvas-color" type="color" value="#17333d" aria-label="选择画布颜色"><input id="chart-canvas-hex" class="chart-hex" value="#17333d" maxlength="7" spellcheck="false" aria-label="画布颜色十六进制"></label><label class="chart-color-field"><span>文字颜色</span><input id="chart-ink-color" type="color" value="#e5eee6" aria-label="选择文字颜色" disabled><input id="chart-ink-hex" class="chart-hex" value="#e5eee6" maxlength="7" spellcheck="false" aria-label="文字颜色十六进制" disabled></label></div><label class="check-field"><input type="checkbox" id="chart-auto-ink" checked>文字自动适配画布</label><p id="chart-colors-label" class="help-note">系列颜色</p><div id="chart-series-colors" class="chart-color-grid"></div></details>
     <label class="field-label" for="chart-data">数据 · CSV</label><textarea id="chart-data" rows="9" spellcheck="false" aria-describedby="chart-data-help"></textarea><p class="help-note" id="chart-data-help">首行为表头，第一列为类别，其后为数值系列；最多 50 行、6 个系列。散点图第一列为 X 坐标。饼图、环形图使用第一系列。</p>
     <div class="enhanced-actions"><label class="button secondary">导入 CSV<input type="file" id="chart-file" accept=".csv,text/csv" hidden></label><button id="chart-demo" class="button secondary">示例数据</button></div>
   </div><div><div id="chart-stage" class="chart-stage" aria-label="图表预览"></div><div class="enhanced-actions"><button id="chart-svg" class="button primary">导出 SVG</button><button id="chart-png" class="button secondary">导出高清 PNG</button></div><p id="chart-status" role="status"></p></div></div>
@@ -300,7 +303,7 @@
   <article class="exp-aside bpm-metronome"><div><h3>精密节拍器</h3><p class="help-note">使用音频时钟提前排程。音量与上方主音量、节拍音量同步，离开此工具时自动停止。</p></div><label>BPM <input type="number" id="bpm-tempo" min="30" max="300" value="120" step="0.1"></label><label>每小节 <select id="bpm-meter"><option value="4">4 拍</option><option value="3">3 拍</option><option value="2">2 拍</option><option value="6">6 拍</option><option value="1">1 拍</option></select></label><button class="button primary" id="bpm-start">开始节拍</button><span id="bpm-beat" aria-hidden="true"></span></article>
 </section>
 <section class="tool-panel" id="tool-model" aria-label="3D 模型预览" hidden>
-  <div class="exp-heading"><div><span class="mini-kicker">ORBIT / MODEL VIEWER</span><h2>3D 模型预览</h2><p>把一个小小的宇宙，放在掌心旋转。</p></div><span class="exp-badge">本地文件 · 六种格式</span></div>
+  <div class="exp-heading"><div><span class="mini-kicker">ORBIT / MODEL VIEWER</span><h2>3D 模型预览</h2></div><span class="exp-badge">本地文件 · 六种格式</span></div>
   <div class="model-stage" id="model-stage"><div id="model-loading">进入工具后加载 3D 预览…</div></div>
   <div class="exp-actions"><label class="button primary">导入模型<input type="file" id="model-files" multiple accept=".glb,.gltf,.obj,.mtl,.stl,.ply,.fbx,.bin,.png,.jpg,.jpeg,.webp" hidden></label><button class="button secondary" id="model-example">黑洞示例</button><button class="button secondary" id="model-frame">居中视角</button><button class="button secondary" id="model-spin" aria-pressed="true">自动旋转：开</button><button class="button secondary" id="model-wire" aria-pressed="false">线框：关</button><button class="button secondary" id="model-shot">导出画面</button></div>
   <div id="model-black-options" class="exp-actions"><button class="button secondary" data-black-feature="lens" aria-pressed="true">引力透镜：开</button><button class="button secondary" data-black-feature="dop" aria-pressed="true">多普勒束射：开</button><button class="button secondary" data-black-feature="disk" aria-pressed="true">吸积盘：开</button></div><p id="model-status" class="help-note" role="status">支持 GLB、glTF、OBJ（含 MTL）、STL、PLY、FBX。拖动旋转，滚轮或双指缩放，右键拖动平移。</p><p class="help-note">可将模型与纹理、BIN 文件一起选择或拖入，文件合计不超过 80 MB。资源须随文件提供，不自动请求外部地址。黑洞按提供的参考重制，使用光线追踪展示引力透镜、旋转吸积盘与多普勒亮度变化。压缩 glTF、特殊材质和外部 FBX 资源可能无法完整显示。</p>

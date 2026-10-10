@@ -2,6 +2,24 @@
 /* Use padding-based squares on older Android WebView cores used by Via. */
 .garden-board{aspect-ratio:auto;z-index:0;isolation:isolate}.garden-board::before{content:"";display:block;padding-top:100%;pointer-events:none}#game-garden .garden-tile{box-sizing:border-box;-webkit-appearance:none;appearance:none;overflow:hidden;filter:none!important;backface-visibility:visible;transition:background-color .12s}#game-garden .garden-tile>svg{position:absolute;left:12%;top:12%;width:76%;height:76%}.garden-slot{aspect-ratio:auto}.garden-slot::before{content:"";display:block;padding-top:100%}.garden-tile>span{font-size:18px;line-height:1}.garden-pile-count,.garden-map-caption{pointer-events:none}
 #tool-chart [hidden],#tool-image [hidden],#tool-video [hidden],#assessment-quiz[hidden],#assessment-result[hidden]{display:none!important}
+/* Chart graphics do not inherit the site's outline icon styles. */
+#chart-stage{border:0;background:transparent}
+#chart-stage>svg{stroke:none;stroke-width:1;font-weight:400}
+#chart-stage text{stroke:none;font-weight:400}
+.chart-colors{margin:20px 0;padding:16px;border:1px solid var(--line);border-radius:12px;background:#9fc5b40a}
+.chart-colors summary{cursor:pointer;color:var(--muted);font-size:13px;margin-bottom:14px}
+.chart-color-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.chart-color-field{display:grid;grid-template-columns:40px minmax(0,1fr);align-items:center;gap:7px;min-width:0;font-size:12px;color:var(--muted)}
+.chart-color-field>span{grid-column:1/-1;overflow-wrap:anywhere}
+#tool-chart .chart-color-field input[type=color]{width:40px;height:36px;padding:3px;border-radius:7px;cursor:pointer}
+#tool-chart .chart-color-field .chart-hex{width:100%;padding:8px;font-size:12px;min-width:0;font-family:monospace}
+#tool-chart .chart-color-field input:disabled{opacity:.55;cursor:default}
+#tool-chart .chart-color-field input[aria-invalid=true]{border-color:#d6a590}
+#tool-chart input[type=color]::-webkit-color-swatch-wrapper,#tool-cad input[type=color]::-webkit-color-swatch-wrapper{padding:0}
+#tool-chart input[type=color]::-webkit-color-swatch,#tool-cad input[type=color]::-webkit-color-swatch{border:0;border-radius:4px}
+#tool-chart input[type=color]::-moz-color-swatch,#tool-cad input[type=color]::-moz-color-swatch{border:0;border-radius:4px}
+#tool-cad #cad-canvas{border:0;box-shadow:none;box-sizing:border-box}
+#tool-cad #cad-canvas:focus-visible{outline:2px solid #61897f;outline-offset:-2px}
 /* Range tracks span the entire control, without text-field padding. */
 #tool-video input[type=range]{appearance:none;-webkit-appearance:none;display:block;height:26px;padding:0;border:0;border-radius:0;background:transparent;margin:0;box-shadow:none;touch-action:none;cursor:pointer;min-width:0}
 #tool-video input[type=range]::-webkit-slider-runnable-track{height:5px;border:0;border-radius:8px;background:#a6c6b550}

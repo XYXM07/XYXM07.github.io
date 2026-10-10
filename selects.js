@@ -5,7 +5,21 @@
   function close(focus=false){if(!opened)return;const previous=opened;opened=null;previous.button.setAttribute('aria-expanded','false');previous.button.removeAttribute('aria-activedescendant');popup.hidden=true;popup.replaceChildren();document.body.classList.remove('select-open');if(focus)previous.button.focus({preventScroll:true});}
   function sync(entry){const selected=entry.select.selectedOptions[0];entry.value.textContent=selected?.textContent||'请选择';entry.button.disabled=entry.select.disabled;}
   function enabled(entry){return [...entry.select.options].map((o,i)=>!o.disabled&&!o.parentElement.disabled?i:-1).filter(i=>i>=0);}
-  function position(){if(!opened)return;const rect=opened.button.getBoundingClientRect();if(rect.bottom<0||rect.top>innerHeight){close();return;}const width=Math.min(Math.max(rect.width,210),innerWidth-24),below=innerHeight-rect.bottom-12,above=rect.top-12,maxHeight=Math.min(350,Math.max(below,above));popup.style.width=width+'px';popup.style.left=Math.max(12,Math.min(rect.left,innerWidth-width-12))+'px';popup.style.maxHeight=maxHeight+'px';popup.style.top='auto';popup.style.bottom='auto';if(below>=Math.min(220,maxHeight)){popup.style.top=rect.bottom+7+'px';}else{popup.style.bottom=innerHeight-rect.top+7+'px';}}
+  function position(){
+    if(!opened)return;
+    const rect=opened.button.getBoundingClientRect(),view=window.visualViewport;
+    const left=(view?view.offsetLeft:0)+12,top=(view?view.offsetTop:0)+12;
+    const right=left+(view?view.width:innerWidth)-24,bottom=top+(view?view.height:innerHeight)-24;
+    if(rect.bottom<top||rect.top>bottom){close();return;}
+    const width=Math.max(0,Math.min(Math.max(rect.width,210),right-left));
+    const below=Math.max(0,bottom-rect.bottom-7),above=Math.max(0,rect.top-top-7);
+    const down=below>=Math.min(220,Math.max(below,above)),maxHeight=Math.min(350,down?below:above);
+    if(!width||maxHeight<1){close();return;}
+    popup.style.width=width+'px';popup.style.left=Math.max(left,Math.min(rect.left,right-width))+'px';
+    popup.style.maxHeight=maxHeight+'px';popup.style.bottom='auto';
+    const height=Math.min(maxHeight,popup.getBoundingClientRect().height||maxHeight);
+    popup.style.top=(down?rect.bottom+7:Math.max(top,rect.top-7-height))+'px';
+  }
   function highlight(index){if(!opened)return;active=index;popup.querySelectorAll('[role="option"]').forEach((item,i)=>item.classList.toggle('highlighted',i===active));const option=popup.children[active];if(option){opened.button.setAttribute('aria-activedescendant',option.id);option.scrollIntoView({block:'nearest'});}}
   function commit(index){if(!opened||!enabled(opened).includes(index))return;const entry=opened;const previous=entry.select.selectedIndex;entry.select.selectedIndex=index;sync(entry);close(true);if(previous!==index){entry.select.dispatchEvent(new Event('input',{bubbles:true}));entry.select.dispatchEvent(new Event('change',{bubbles:true}));}entries.forEach(sync);}
   function open(entry){if(opened===entry){close();return;}close();if(entry.select.disabled)return;opened=entry;document.body.classList.add('select-open');entry.button.setAttribute('aria-expanded','true');popup.id=entry.select.id+'-list';popup.setAttribute('role','listbox');popup.setAttribute('aria-labelledby',entry.labelId);entry.button.setAttribute('aria-controls',popup.id);popup.replaceChildren();[...entry.select.options].forEach((option,i)=>{const item=document.createElement('div');item.id=entry.select.id+'-option-'+i;item.setAttribute('role','option');item.setAttribute('aria-selected',String(i===entry.select.selectedIndex));item.textContent=option.textContent;if(option.disabled||option.parentElement.disabled){item.setAttribute('aria-disabled','true');}item.addEventListener('pointermove',()=>{if(enabled(entry).includes(i))highlight(i);},{passive:true});item.addEventListener('click',()=>commit(i));popup.append(item);});popup.hidden=false;position();highlight(entry.select.selectedIndex>=0?entry.select.selectedIndex:enabled(entry)[0]);}
@@ -31,4 +45,5 @@
   document.addEventListener('change',()=>queueMicrotask(()=>entries.forEach(sync)));
   document.addEventListener('scroll',e=>{if(!popup.contains(e.target))position();},true);
   window.addEventListener('resize',()=>close());document.addEventListener('site:pagechange',()=>close());document.addEventListener('visibilitychange',()=>{if(document.hidden)close();});
+  if(window.visualViewport){window.visualViewport.addEventListener('resize',position);window.visualViewport.addEventListener('scroll',position);}
 })();
