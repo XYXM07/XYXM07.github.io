@@ -9,7 +9,7 @@
     controls.forEach(c=>c.disabled=busy);$('#audio-convert-bitrate').disabled=busy||format.lossless;
     const selection=$('#audio-convert-scope').querySelector('[value=selection]');selection.disabled=!s.duration;
     if(!s.duration)$('#audio-convert-scope').value='all';
-    for(const o of $('#audio-convert-rate').options)o.disabled=format.opus&&o.value!=='auto'&&![8000,16000,24000,48000].includes(Number(o.value))||$('#audio-convert-format').value==='mp3'&&Number(o.value)>48000;
+    for(const o of $('#audio-convert-rate').options)o.disabled=format.opus&&o.value!=='auto'&&!($('#audio-convert-channels').value==='1'?[8000,16000,24000,48000]:[48000]).includes(Number(o.value))||$('#audio-convert-format').value==='mp3'&&Number(o.value)>48000;
     if($('#audio-convert-rate').selectedOptions[0].disabled)$('#audio-convert-rate').value='auto';
     $('#audio-convert-run').disabled=busy||!s.file||s.loading;$('#audio-convert-cancel').hidden=!busy;
     $('#audio-convert-note').textContent=format.lossless?'无损输出不会额外引入有损压缩；无法恢复原文件已丢失的音质。':format.opus?'Opus 自动使用 48000 Hz、立体声；也可手动选择支持的采样率与声道。':'码率越高通常文件越大；转换为有损格式会重新压缩音频。';
@@ -27,7 +27,7 @@
     try{
       if(!window.Worker||!window.WebAssembly)throw Error('当前浏览器不支持音频转换，请使用新版浏览器');
       const bytes=new Uint8Array(await s.file.arrayBuffer());if(id!==job)return;
-      if(!worker)worker=new Worker('audio-convert-worker.js?v=1d0c3994f124');
+      if(!worker)worker=new Worker('audio-convert-worker.js?v=a7f2f09b3f42');
       worker.onmessage=({data})=>{
         if(data.id!==job)return;
         if(data.type==='loading'){status.textContent='正在加载本地转换组件，首次需要下载约 31 MB…';}

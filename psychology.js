@@ -16,7 +16,7 @@
     const start=node('button',session.started?'继续答题':t.clinician?'填写评定记录':'开始答题','button primary');start.type='button';start.addEventListener('click',()=>{session.started=true;view();focusArea($('#assessment-quiz'));});box.append(start);
     const details=node('details',null,'assessment-extra');details.append(node('summary','题目来源与计分方法'),node('p',t.method));source(details);box.append(details);
   }
-  function support(parent){const p=node('p',supportText,'support-note');p.setAttribute('role','status');parent.append(p);}
+  function support(parent){const p=node('div',null,'support-note');p.setAttribute('role','status');p.append(node('p',supportText));const close=node('button','知道了','button secondary');close.type='button';close.addEventListener('click',()=>p.remove());p.append(close);parent.append(p);}
   function questions(){
     const t=A.tests[kind],start=session.page*size(),end=Math.min(start+size(),t.count),box=$('#assessment-questions');box.replaceChildren();
     if(t.mode==='checklist')box.append(node('p',t.instruction,'question-original'),node('p','勾选愿意做的活动；未勾选的项目不计分。每组 10 项。','help-note'));
@@ -54,12 +54,14 @@
       if(Number.isFinite(score.raw))summary.append(node('span','原始分 '+score.raw));
       if(score.further)box.append(node('p','达到该量表的进一步评估参考分数。若症状持续或影响生活，建议联系心理健康专业人员。','assessment-note'));
       if(kind==='phq9'&&Number.isInteger(session.impact))box.append(node('p','你报告的功能影响：'+['没有困难','有些困难','非常困难','极其困难'][session.impact]+'（不计入总分）。'));
-      if(score.support)support(box);
+      if(score.support&&kind!=='sds')support(box);
     }
+    const feedback=window.AssessmentFeedback?.evaluate(kind,score,session.answers,A.tests[kind]);
+    if(feedback){const section=node('section',null,'assessment-evaluation');section.append(node('h3','结果评估'),node('strong',feedback.title),node('p',feedback.summary));for(const row of feedback.details||[]){const detail=node('div',null,'evaluation-row');detail.append(node('h4',row.title),node('p',row.text));section.append(detail);}section.append(node('h4','可以从这里开始'));const list=node('ul');feedback.actions.forEach(text=>list.append(node('li',text)));section.append(list);box.append(section);}
     box.append(node('h3','计分依据'),node('p',t.method));source(box);
     const revise=node('button','返回修改答案','button secondary');revise.type='button';revise.addEventListener('click',()=>{session.completed=false;session.page=0;view();focusArea($('#assessment-quiz'));});box.append(revise);
   }
-  function view(){const external=A.tests[kind].mode==='external';$('#assessment-intro').hidden=!external&&session.started;$('#assessment-quiz').hidden=external||!session.started||session.completed;$('#assessment-result').hidden=external||!session.completed;$('#assessment-reset-row').hidden=external||!session.started;if(external)intro();else if(session.completed)result();else if(session.started)questions();else intro();}
+  function view(){const external=A.tests[kind].mode==='external';$('#assessment-intro').hidden=!external&&session.started;$('#assessment-quiz').hidden=external||!session.started||session.completed;$('#assessment-result').hidden=external||!session.completed;$('#assessment-reset-row').hidden=external||!session.started;if(external)intro();else if(session.completed){$('#assessment-questions').replaceChildren();result();}else if(session.started)questions();else intro();}
   function route(){const [page,section]=location.hash.slice(1).split('/');if(page!=='psychology')return;kind=Object.hasOwn(A.tests,section)?section:null;$('#psychology-directory').hidden=!!kind;$('#psychology-workspace').hidden=!kind;$('#psychology-title').textContent=kind?A.tests[kind].title:'心理测试';$('#psychology-picker-label').textContent=kind?A.tests[kind].title:'选择测试';if(!kind)return;if(!sessions.has(kind))sessions.set(kind,{answers:Array(A.tests[kind].count).fill(A.tests[kind].mode==='checklist'?false:null),page:0,started:false,completed:false,impact:null});session=sessions.get(kind);view();}
   $('#assessment-form').addEventListener('submit',e=>{e.preventDefault();if(!session)return;const t=A.tests[kind],start=session.page*size(),end=Math.min(start+size(),t.count);if(t.mode!=='checklist')for(let i=start;i<end;i++)if(!Number.isInteger(session.answers[i])){$('#assessment-status').textContent='请先回答第 '+(i+1)+' 题。';focusArea($('#question-'+i));return;}if(end<t.count){session.page++;questions();focusArea($('#assessment-quiz'));}else{try{A.score(kind,session.answers);session.completed=true;view();focusArea($('#assessment-result'));}catch(err){$('#assessment-status').textContent=err.message;}}});
   $('#assessment-prev').addEventListener('click',()=>{if(session.page>0){session.page--;questions();focusArea($('#assessment-quiz'));}});$('#assessment-reset').addEventListener('click',()=>{sessions.delete(kind);route();focusArea($('#assessment-intro'));});document.addEventListener('site:pagechange',route);route();

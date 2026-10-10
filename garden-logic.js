@@ -43,7 +43,7 @@
   function snapshot(s){return {removed:s.tiles.map(t=>t.removed),tray:s.tray.slice(),shelf:s.shelf.slice(),moves:s.moves,cleared:s.cleared,status:s.status};}
   function pick(s,id,fromShelf=false){if(s.status!=='playing')return false;const t=s.tiles[id];if(!t||(fromShelf?!s.shelf.includes(id):!free(s,t)))return false;
     s.history.push(snapshot(s));if(s.history.length>3)s.history.shift();if(fromShelf)s.shelf.splice(s.shelf.indexOf(id),1);else t.removed=true;
-    const last=s.tray.findLastIndex(i=>s.tiles[i].kind===t.kind);s.tray.splice(last<0?s.tray.length:last+1,0,id);s.moves++;
+    let last=-1;for(let i=s.tray.length-1;i>=0;i--)if(s.tiles[s.tray[i]].kind===t.kind){last=i;break;}s.tray.splice(last<0?s.tray.length:last+1,0,id);s.moves++;
     const match=s.tray.filter(i=>s.tiles[i].kind===t.kind);if(match.length===3){s.tray=s.tray.filter(i=>!match.includes(i));s.cleared+=3;}
     if(s.tray.length>=7)s.status='lost';else if(s.tiles.every(t=>t.removed)&&!s.tray.length&&!s.shelf.length)s.status='won';return true;
   }

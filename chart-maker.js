@@ -1,0 +1,13 @@
+(() => {
+  'use strict';const $=s=>document.querySelector(s),L=ChartLogic;let current='',serial=0;
+  const sample='月份,访问量,收藏量\n一月,120,35\n二月,180,65\n三月,155,48\n四月,260,92\n五月,320,125';
+  function settings(){return {type:$('#chart-type').value,title:$('#chart-name').value.slice(0,80),palette:$('#chart-palette').value,dark:$('#chart-background').value==='dark',legend:$('#chart-legend').checked};}
+  function render(){try{const data=L.parse($('#chart-data').value);current=L.svg(data,settings());$('#chart-stage').innerHTML=current;$('#chart-status').textContent=data.labels.length+' 个类别 · '+data.series.length+' 个系列'+(['pie','donut'].includes(settings().type)?' · 显示第一系列':'');$('#chart-svg').disabled=$('#chart-png').disabled=false;}catch(e){current='';$('#chart-stage').replaceChildren();$('#chart-status').textContent=e.message;$('#chart-svg').disabled=$('#chart-png').disabled=true;}}
+  function download(blob,ext){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=($('#chart-name').value.trim()||'我的图表').replace(/[\\/:*?"<>|]/g,'_')+'.'+ext;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+  for(const id of ['chart-data','chart-type','chart-name','chart-palette','chart-background','chart-legend'])$('#'+id).addEventListener('input',render);
+  $('#chart-demo').onclick=()=>{$('#chart-data').value=settings().type==='scatter'?'X,系列 A,系列 B\n1,3,6\n2,5,4\n3,6,7\n4,8,9':sample;render();};
+  $('#chart-file').onchange=async()=>{const id=++serial,file=$('#chart-file').files[0];if(!file)return;try{if(file.size>200000)throw Error('CSV 文件请控制在 200 KB 以内');const value=await file.text();if(id!==serial)return;$('#chart-data').value=value.replace(/^\uFEFF/,'');render();}catch(e){$('#chart-status').textContent=e.message;}};
+  $('#chart-svg').onclick=()=>{if(current)download(new Blob([current],{type:'image/svg+xml;charset=utf-8'}),'svg');};
+  $('#chart-png').onclick=async()=>{if(!current)return;const source=current,button=$('#chart-png');button.disabled=true;const url=URL.createObjectURL(new Blob([source],{type:'image/svg+xml;charset=utf-8'}));try{const img=new Image();await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(Error('图表图片无法生成'));img.src=url;});const c=document.createElement('canvas');c.width=2000;c.height=1280;c.getContext('2d').drawImage(img,0,0,c.width,c.height);const blob=await new Promise(resolve=>c.toBlob(resolve,'image/png'));if(!blob)throw Error('PNG 导出失败');download(blob,'png');}catch(e){$('#chart-status').textContent=e.message;}finally{URL.revokeObjectURL(url);button.disabled=!current;}};
+  $('#chart-data').value=sample;render();
+})();

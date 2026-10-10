@@ -19,13 +19,16 @@
     if(duration!=null&&(!Number.isFinite(duration)||duration<=0||duration>900))throw Error('请选择 15 分钟以内的音频');
     if(scope==='selection'&&(!Number.isFinite(start)||!Number.isFinite(end)||start<0||end<=start||duration==null||end>duration+.01))throw Error('请先选择有效的音频片段');
     if(formats[format].opus&&sampleRate!=='auto'&&![8000,16000,24000,48000].includes(Number(sampleRate)))throw Error('Opus 支持 8000、16000、24000 或 48000 Hz；也可保留自动设置');
+    if(formats[format].opus&&Number(channels)!==1&&sampleRate!=='auto'&&Number(sampleRate)!==48000)throw Error('立体声 Opus 请使用自动或 48000 Hz；较低采样率可选择单声道');
     if(format==='mp3'&&Number(sampleRate)>48000)throw Error('MP3 采样率最高为 48000 Hz');
     return {format,bitrate:Number(bitrate),sampleRate:sampleRate==='auto'?'auto':Number(sampleRate),channels:channels==='auto'?'auto':Number(channels),scope,start,end,duration};
   }
   function command(input,output,options){
     const o=settings(options),f=formats[o.format],args=['-hide_banner','-y','-i',input];
     if(o.scope==='selection')args.push('-ss',String(o.start),'-t',String(o.end-o.start));
-    args.push('-map','0:a:0','-vn','-map_metadata','-1','-c:a',f.codec);
+    const stereoOpus=f.opus&&o.channels!==1;
+    args.push('-map','0:a:0','-vn','-map_metadata','-1','-c:a',stereoOpus?'opus':f.codec);
+    if(stereoOpus)args.push('-strict','-2');
     if(!f.lossless)args.push('-b:a',o.bitrate+'k');
     if(o.sampleRate!=='auto')args.push('-ar',String(o.sampleRate));else if(f.opus)args.push('-ar','48000');
     if(o.channels!=='auto')args.push('-ac',String(o.channels));else if(f.opus)args.push('-ac','2');

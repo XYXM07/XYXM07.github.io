@@ -3,9 +3,9 @@
   const LIMIT=1e12,GRID=20,THRESHOLD=220,FACTORS=[1,2,5,10,20,50];
   const tickets=[
     {name:'晨光纸笺',cost:10,unlock:0,probability:.60,color:'#91bfae',mode:'三同图符',description:'每局三个图符完全相同，领取该局右侧所示奖金'},
-    {name:'月庭来信',cost:50,unlock:150,probability:.22,color:'#8cbed2',mode:'幸运号码',description:'命中中奖号码领奖金，命中翻倍号码领双倍奖金'},
-    {name:'星海邀约',cost:200,unlock:600,probability:.10,color:'#d9b56d',mode:'星光宾果',description:'刮开叫号，点亮宾果卡，按连线、四角或 X 形领取最高奖级'},
-    {name:'极光秘卷',cost:1000,unlock:2000,probability:.25,color:'#c7a38e',mode:'图符寻宝',description:'刮出幸运图符，集齐一条路线上的全部图符即可领该路线奖金'}
+    {name:'月庭来信',cost:50,unlock:0,probability:.22,color:'#8cbed2',mode:'幸运号码',description:'命中中奖号码领奖金，命中翻倍号码领双倍奖金'},
+    {name:'星海邀约',cost:200,unlock:0,probability:.10,color:'#d9b56d',mode:'星光宾果',description:'刮开叫号，点亮宾果卡，按连线、四角或 X 形领取最高奖级'},
+    {name:'极光秘卷',cost:1000,unlock:0,probability:.25,color:'#c7a38e',mode:'图符寻宝',description:'刮出幸运图符，集齐一条路线上的全部图符即可领该路线奖金'}
   ];
   const symbols=['星芒','月弧','花瓣','晶石','叶片','日轮','波纹','云朵','钥匙','铃铛','行星','羽毛'].map(name=>({name}));
   const upgrades={brush:{name:'宽幅刮刀',base:30,growth:1.8,max:5}};
@@ -72,7 +72,7 @@
   function winning(c,i){const t=c.tiles[i];if(!t.revealed)return false;if(c.tier===0){const row=c.tiles.slice(Math.floor(i/3)*3,Math.floor(i/3)*3+3);return row.every(x=>x.revealed&&x.symbol===row[0].symbol);}if(c.tier===1)return c.targets.includes(t.number)||t.number===c.doubleNumber;if(c.tier===2)return c.board.includes(t.number);return c.routes.some(r=>r.symbols.includes(t.symbol));}
   function buy(s,tier=s.selected,rng=Math.random){
     if(!integer(tier,0,3))throw Error('请选择有效票卡');if(s.current&&!s.current.finished)throw Error('先完成或放弃当前票卡');const ticket=tickets[tier];
-    if(s.earned<ticket.unlock)throw Error('累计奖励达到 '+ticket.unlock+' 后解锁');if(s.coins<ticket.cost)throw Error('金币不足，可以先收集微光');s.coins-=ticket.cost;s.selected=tier;
+    if(s.coins<ticket.cost)throw Error('金币不足，可以先收集微光');s.coins-=ticket.cost;s.selected=tier;
     const shouldWin=chance(rng)<ticket.probability;
     const c={tier,probability:ticket.probability,tiles:[],paid:Array(paidLength(tier)).fill(false),targets:[],rowFactors:[],doubleNumber:null,board:[],routes:[],gain:0,finished:false};
     if(tier===0)c.rowFactors=Array.from({length:3},()=>factor(rng));

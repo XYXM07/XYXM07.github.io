@@ -39,8 +39,8 @@
     const timeout=setTimeout(()=>controller.abort(),15000);
     try{
       let items=cache.get(name.toLowerCase());
-      if(!items){const url=new URL('https://geocoding-api.open-meteo.com/v1/search');url.search=new URLSearchParams({name,count:6,language:'zh',format:'json'});const res=await fetch(url,{signal:controller.signal});if(!res.ok)throw new Error();const data=await res.json();items=(data.results||[]).filter(v=>valid(Number(v.latitude),Number(v.longitude)));cache.set(name.toLowerCase(),items);if(cache.size>20)cache.delete(cache.keys().next().value);}
-      if(run!==serial||!active)return;cityResults(items);message(items.length?'请选择要查看的城市。':'没有找到该城市，可以输入英文名称或直接跳转坐标。');
+      if(!items){items=(await CitySearch.search(name,{signal:controller.signal})).filter(v=>valid(Number(v.latitude),Number(v.longitude)));cache.set(name.toLowerCase(),items);if(cache.size>20)cache.delete(cache.keys().next().value);}
+      if(run!==serial||!active)return;cityResults(items);message(items.length?'请选择要查看的城市。':'没有找到该城市，请检查名称，或直接跳转坐标。');
     }catch{if(run===serial&&active)message('城市搜索暂时不可用，请检查网络后重试，或使用城市快捷入口。');}
     finally{clearTimeout(timeout);if(run===serial)request=null;}
   });

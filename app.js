@@ -193,19 +193,9 @@
   const now = new Date();
   document.querySelector('#today').textContent = new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' }).format(now);
   document.querySelector('#year').textContent = now.getFullYear();
-  const themeButton = document.querySelector('.theme-toggle');
-  function setTheme(light) {
-    document.body.classList.toggle('light', light);
-    themeButton.querySelector('use').setAttribute('href', light ? '#i-moon' : '#i-sun');
-    themeButton.querySelector('span').textContent = light ? '切换深色' : '切换浅色';
-    themeButton.setAttribute('aria-label', light ? '切换为深色主题' : '切换为浅色主题');
-    document.querySelector('meta[name="theme-color"]').content = light ? '#487b8a' : '#183544';
-  }
-  setTheme(false);
-  themeButton.addEventListener('click', () => {
-    const light = !document.body.classList.contains('light');
-    setTheme(light);
-  });
+  document.body.classList.remove('light');
+  document.querySelector('.theme-toggle')?.remove();
+  document.querySelector('meta[name="theme-color"]').content = '#183544';
   mobileButton.addEventListener('click', () => {
     const open = document.body.classList.toggle('nav-open');
     mobileButton.setAttribute('aria-expanded', String(open));
