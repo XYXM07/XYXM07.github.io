@@ -54,7 +54,6 @@
       if(Number.isFinite(score.raw))summary.append(node('span','原始分 '+score.raw));
       if(score.further)box.append(node('p','达到该量表的进一步评估参考分数。若症状持续或影响生活，建议联系心理健康专业人员。','assessment-note'));
       if(kind==='phq9'&&Number.isInteger(session.impact))box.append(node('p','你报告的功能影响：'+['没有困难','有些困难','非常困难','极其困难'][session.impact]+'（不计入总分）。'));
-      if(score.support&&kind!=='sds')support(box);
     }
     const feedback=window.AssessmentFeedback?.evaluate(kind,score,session.answers,A.tests[kind]);
     if(feedback){const section=node('section',null,'assessment-evaluation');section.append(node('h3','结果评估'),node('strong',feedback.title),node('p',feedback.summary));for(const row of feedback.details||[]){const detail=node('div',null,'evaluation-row');detail.append(node('h4',row.title),node('p',row.text));section.append(detail);}section.append(node('h4','可以从这里开始'));const list=node('ul');feedback.actions.forEach(text=>list.append(node('li',text)));section.append(list);box.append(section);}
