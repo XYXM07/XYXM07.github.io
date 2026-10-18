@@ -1,0 +1,357 @@
+/* ============================================================
+   Light effects layer
+   - Glow + travelling highlight for the two home hero buttons
+   - Animated highlight for every dropdown menu
+   Loaded after the main visual layers, before the narrow-screen overrides.
+   ============================================================ */
+
+/* ---------- Home hero buttons ---------- */
+.hero-actions .button {
+  isolation: isolate;
+  overflow: hidden;
+  border-color: rgba(231, 247, 238, .28);
+}
+
+/* Page-scoped specificity keeps these snappy timings above motion.css. */
+#page-home .hero-actions .button {
+  transition:
+    scale .18s var(--motion-ease, var(--ease)),
+    translate .18s var(--motion-ease, var(--ease)),
+    transform .22s var(--ease),
+    background-color .18s ease,
+    border-color .18s ease,
+    box-shadow .18s var(--ease),
+    color .16s ease,
+    filter .15s ease;
+}
+
+/* Soft inner depth above the button fill, below the label. */
+.hero-actions .button::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .16), transparent 46%, rgba(7, 30, 38, .08));
+  opacity: .7;
+  transition: opacity .35s ease;
+}
+
+/* The light band that travels across the button. */
+.hero-actions .button::after {
+  content: "";
+  position: absolute;
+  top: -24%;
+  bottom: -24%;
+  left: -42%;
+  z-index: 3;
+  width: 44%;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg,
+      transparent,
+      rgba(179, 238, 224, .16) 24%,
+      rgba(255, 255, 255, .94) 48%,
+      rgba(179, 238, 224, .34) 58%,
+      transparent);
+  opacity: 0;
+  transform: translateX(0) skewX(-18deg);
+}
+
+.hero-actions .button > * {
+  position: relative;
+  z-index: 2;
+}
+
+.hero-actions .button svg {
+  transition: transform .5s var(--ease), filter .3s ease;
+}
+
+.hero-actions .button.primary {
+  background: linear-gradient(118deg, #f3f7e8, #dfece3 58%, #e9f4e8);
+  color: #1f3b3d;
+  border-color: rgba(255, 255, 255, .36);
+  box-shadow:
+    0 8px 24px rgba(5, 23, 21, .22),
+    inset 0 0 0 1px rgba(255, 255, 255, .18),
+    0 0 28px rgba(212, 240, 224, .2);
+}
+
+.hero-actions .button.primary:is(:hover, :focus-visible) {
+  background: linear-gradient(118deg, #fbfff2, #e8f6ec 58%, #f1fbf0);
+  border-color: rgba(255, 255, 255, .86);
+  box-shadow:
+    0 16px 38px rgba(4, 22, 20, .34),
+    inset 0 0 0 1px rgba(255, 255, 255, .58),
+    0 0 0 5px rgba(224, 248, 235, .08),
+    0 0 34px rgba(224, 249, 234, .62),
+    0 0 76px rgba(182, 222, 220, .28);
+}
+
+.hero-actions .button.secondary {
+  background-color: rgba(217, 242, 229, .055);
+  background-image:
+    linear-gradient(120deg, rgba(255, 255, 255, .11), transparent 46%, rgba(182, 222, 220, .05)),
+    linear-gradient(180deg, rgba(255, 255, 255, .04), transparent 60%);
+  border-color: rgba(229, 244, 239, .36);
+  color: #f3f7ed;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .16),
+    0 8px 28px rgba(6, 26, 36, .14),
+    0 0 20px rgba(182, 222, 220, .1);
+}
+
+.hero-actions .button.secondary:is(:hover, :focus-visible) {
+  background-color: rgba(190, 236, 223, .13);
+  background-image:
+    linear-gradient(120deg, rgba(230, 255, 246, .18), transparent 52%, rgba(182, 222, 220, .09)),
+    linear-gradient(180deg, rgba(255, 255, 255, .07), transparent 60%);
+  border-color: rgba(207, 247, 234, .92);
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .34),
+    0 12px 34px rgba(5, 24, 33, .24),
+    0 0 0 5px rgba(182, 222, 220, .08),
+    0 0 32px rgba(182, 222, 220, .52),
+    0 0 74px rgba(182, 222, 220, .22);
+}
+
+.hero-actions .button:is(:hover, :focus-visible)::before {
+  opacity: 1;
+}
+
+/* A quick, single sweep on hover / keyboard focus, like the reference. */
+.hero-actions .button:is(:hover, :focus-visible)::after {
+  animation: heroButtonFlash .58s cubic-bezier(.2, .7, .25, 1) both;
+}
+
+.hero-actions .button:is(:hover, :focus-visible) svg {
+  filter: drop-shadow(0 0 7px rgba(219, 250, 240, .62));
+}
+
+@keyframes heroButtonFlash {
+  0% {
+    transform: translateX(0) skewX(-18deg);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  72% {
+    opacity: .9;
+  }
+  100% {
+    transform: translateX(320%) skewX(-18deg);
+    opacity: 0;
+  }
+}
+
+/* ---------- Dropdown surfaces ---------- */
+@media (min-width: 651px) {
+  .submenu:not([hidden]) {
+    border-color: rgba(209, 241, 232, .27);
+    box-shadow:
+      0 20px 55px rgba(4, 21, 31, .38),
+      inset 0 1px 0 rgba(255, 255, 255, .08),
+      0 0 0 1px rgba(182, 222, 220, .035);
+  }
+}
+
+.select-popover:not([hidden]) {
+  border-color: rgba(209, 241, 232, .32);
+  box-shadow:
+    0 20px 48px rgba(4, 21, 31, .46),
+    inset 0 1px 0 rgba(255, 255, 255, .08),
+    0 0 24px rgba(182, 222, 220, .07);
+}
+
+/* Sidebar navigation and the hub route pickers share .submenu items. */
+.submenu a,
+.submenu .sub-disclosure {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.submenu a::before,
+.submenu .sub-disclosure::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(130% 170% at 0% 50%, rgba(201, 245, 232, .2), transparent 58%),
+    linear-gradient(100deg,
+      transparent 18%,
+      rgba(201, 245, 232, .15) 42%,
+      rgba(255, 255, 255, .09) 51%,
+      transparent 78%);
+  background-repeat: no-repeat;
+  background-size: 100% 100%, 215% 100%;
+  background-position: 0 0, 145% 0;
+  opacity: 0;
+  transition: opacity .13s ease, background-position .24s var(--ease);
+}
+
+.submenu a:is(:hover, :focus-visible)::before,
+.submenu .sub-disclosure:is(:hover, :focus-visible)::before,
+.submenu a.active::before,
+.submenu a[aria-current="page"]::before {
+  background-position: 0 0, -20% 0;
+  opacity: 1;
+}
+
+.submenu a:is(:hover, :focus-visible),
+.submenu .sub-disclosure:is(:hover, :focus-visible) {
+  color: #f8fff6;
+  background-color: rgba(182, 222, 220, .07);
+  box-shadow:
+    inset 2px 0 0 rgba(194, 241, 227, .88),
+    0 0 18px rgba(182, 222, 220, .1);
+}
+
+.submenu a.active,
+.submenu a[aria-current="page"],
+.route-picker .submenu a.active {
+  color: #fbfff8;
+  background-color: rgba(182, 222, 220, .11);
+  box-shadow:
+    inset 2px 0 0 rgba(201, 247, 233, .95),
+    0 0 18px rgba(182, 222, 220, .12);
+}
+
+.submenu a:focus-visible,
+.submenu .sub-disclosure:focus-visible {
+  outline: 2px solid rgba(201, 247, 233, .9);
+  outline-offset: -2px;
+}
+
+/* ---------- Dropdown triggers ---------- */
+.custom-select .select-trigger,
+.route-trigger {
+  transition:
+    background-color .18s ease,
+    border-color .18s ease,
+    box-shadow .2s var(--ease),
+    color .15s ease;
+}
+
+.custom-select .select-trigger:is(:hover, :focus-visible),
+.route-trigger:is(:hover, :focus-visible),
+.custom-select .select-trigger[aria-expanded="true"],
+.route-trigger[aria-expanded="true"] {
+  border-color: rgba(201, 247, 233, .62);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .12),
+    0 0 0 3px rgba(182, 222, 220, .08),
+    0 0 24px rgba(182, 222, 220, .14);
+}
+
+.custom-select .select-trigger[aria-expanded="true"],
+.route-trigger[aria-expanded="true"] {
+  color: #f8fff6;
+  background-color: rgba(182, 222, 220, .07);
+}
+
+.select-trigger svg {
+  transition: transform .25s var(--ease), filter .25s ease;
+}
+
+.select-trigger[aria-expanded="true"] svg {
+  filter: drop-shadow(0 0 6px rgba(201, 247, 233, .65));
+}
+
+/* ---------- Custom select options (created by selects.js) ---------- */
+.select-popover [role="option"] {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background-color: transparent;
+  transition: background-color .14s ease, color .12s ease, box-shadow .18s ease;
+}
+
+.select-popover [role="option"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(201, 245, 232, .21), rgba(182, 222, 220, .075) 53%, transparent),
+    linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .1) 50%, transparent 68%);
+  background-repeat: no-repeat;
+  background-size: 100% 100%, 220% 100%;
+  background-position: 0 0, 145% 0;
+  opacity: 0;
+  transform: scaleX(.72);
+  transform-origin: left center;
+  transition: opacity .12s ease, transform .18s var(--ease), background-position .24s var(--ease);
+}
+
+.select-popover [role="option"]:is(.highlighted, :hover, :focus-visible)::before {
+  opacity: 1;
+  transform: scaleX(1);
+  background-position: 0 0, -20% 0;
+}
+
+.select-popover [role="option"]:is(.highlighted, :hover, :focus-visible) {
+  color: #f8fff6;
+  background-color: rgba(182, 222, 220, .075);
+  box-shadow:
+    inset 2px 0 0 rgba(201, 247, 233, .92),
+    0 0 17px rgba(182, 222, 220, .09);
+}
+
+.select-popover [role="option"][aria-selected="true"] {
+  color: #f8fff7;
+  background-color: rgba(182, 222, 220, .11);
+  box-shadow: inset 2px 0 0 rgba(201, 247, 233, .5);
+}
+
+.select-popover [role="option"][aria-selected="true"]:is(.highlighted, :hover, :focus-visible) {
+  background-color: rgba(182, 222, 220, .15);
+  box-shadow:
+    inset 2px 0 0 rgba(201, 247, 233, 1),
+    0 0 20px rgba(182, 222, 220, .13);
+}
+
+/* Disabled options should stay visually muted, even when hovered. */
+.select-popover [role="option"][aria-disabled="true"]:is(.highlighted, :hover, :focus-visible) {
+  color: rgba(215, 231, 233, .4);
+  background-color: transparent;
+  box-shadow: none;
+}
+
+.select-popover [role="option"][aria-disabled="true"]:is(.highlighted, :hover, :focus-visible)::before {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-actions .button::after {
+    animation: none !important;
+    opacity: 0;
+  }
+
+  .hero-actions .button::before,
+  .hero-actions .button svg,
+  .submenu a::before,
+  .submenu .sub-disclosure::before,
+  .select-popover [role="option"]::before,
+  .select-trigger svg {
+    transition: none;
+  }
+
+  .submenu a:is(:hover, :focus-visible)::before,
+  .submenu .sub-disclosure:is(:hover, :focus-visible)::before,
+  .submenu a.active::before,
+  .submenu a[aria-current="page"]::before,
+  .select-popover [role="option"]:is(.highlighted, :hover, :focus-visible)::before {
+    background-position: 0 0;
+    transform: none;
+  }
+}
