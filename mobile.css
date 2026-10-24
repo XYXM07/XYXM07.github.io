@@ -165,14 +165,14 @@ html {-webkit-text-size-adjust:100%;text-size-adjust:100%}
   .sidebar {padding-top:16px;gap:12px}
 }
 
-/* Shared dropdowns: muted jade thumb over the dark glass surface. */
-.submenu,.select-popover {
+/* Dropdowns and search share the same muted jade scrollbar. */
+.submenu,.select-popover,.search-results,.search-dialog {
   scrollbar-width:thin;
   scrollbar-color:#789f99 rgba(9,32,44,.16);
 }
-.submenu::-webkit-scrollbar,.select-popover::-webkit-scrollbar {width:8px;height:8px}
-.submenu::-webkit-scrollbar-track,.select-popover::-webkit-scrollbar-track {background:rgba(9,32,44,.16);border-radius:999px;margin-block:8px}
-.submenu::-webkit-scrollbar-thumb,.select-popover::-webkit-scrollbar-thumb {background:#789f99;border:2px solid transparent;background-clip:padding-box;border-radius:999px}
-.submenu::-webkit-scrollbar-thumb:hover,.select-popover::-webkit-scrollbar-thumb:hover {background-color:#9fbfb3}
-.submenu::-webkit-scrollbar-thumb:active,.select-popover::-webkit-scrollbar-thumb:active {background-color:#bed7c6}
-.submenu::-webkit-scrollbar-corner,.select-popover::-webkit-scrollbar-corner {background:transparent}
+.submenu::-webkit-scrollbar,.select-popover::-webkit-scrollbar,.search-results::-webkit-scrollbar,.search-dialog::-webkit-scrollbar {width:8px;height:8px}
+.submenu::-webkit-scrollbar-track,.select-popover::-webkit-scrollbar-track,.search-results::-webkit-scrollbar-track,.search-dialog::-webkit-scrollbar-track {background:rgba(9,32,44,.16);border-radius:999px;margin-block:8px}
+.submenu::-webkit-scrollbar-thumb,.select-popover::-webkit-scrollbar-thumb,.search-results::-webkit-scrollbar-thumb,.search-dialog::-webkit-scrollbar-thumb {background:#789f99;border:2px solid transparent;background-clip:padding-box;border-radius:999px}
+.submenu::-webkit-scrollbar-thumb:hover,.select-popover::-webkit-scrollbar-thumb:hover,.search-results::-webkit-scrollbar-thumb:hover,.search-dialog::-webkit-scrollbar-thumb:hover {background-color:#9fbfb3}
+.submenu::-webkit-scrollbar-thumb:active,.select-popover::-webkit-scrollbar-thumb:active,.search-results::-webkit-scrollbar-thumb:active,.search-dialog::-webkit-scrollbar-thumb:active {background-color:#bed7c6}
+.submenu::-webkit-scrollbar-corner,.select-popover::-webkit-scrollbar-corner,.search-results::-webkit-scrollbar-corner,.search-dialog::-webkit-scrollbar-corner {background:transparent}
