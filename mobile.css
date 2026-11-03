@@ -165,6 +165,22 @@ html {-webkit-text-size-adjust:100%;text-size-adjust:100%}
   .sidebar {padding-top:16px;gap:12px}
 }
 
+/* The document scrollbar follows the site's dark blue and muted jade palette. */
+html,body {scrollbar-width:thin;scrollbar-color:#789f99 #102b38}
+html::-webkit-scrollbar,body::-webkit-scrollbar {width:10px;height:10px}
+html::-webkit-scrollbar-track,body::-webkit-scrollbar-track {background:#102b38}
+html::-webkit-scrollbar-thumb,body::-webkit-scrollbar-thumb {background:#789f99;border:2px solid #102b38;background-clip:padding-box;border-radius:999px;min-height:40px}
+html::-webkit-scrollbar-thumb:hover,body::-webkit-scrollbar-thumb:hover {background-color:#9fbfb3}
+html::-webkit-scrollbar-thumb:active,body::-webkit-scrollbar-thumb:active {background-color:#bed7c6}
+html::-webkit-scrollbar-corner,body::-webkit-scrollbar-corner {background:#102b38}
+/* Let WebKit/Blink use the rounded thumb and its hover/drag states. */
+@supports selector(::-webkit-scrollbar) {
+  html,body {scrollbar-width:auto;scrollbar-color:auto}
+}
+@media(max-width:900px) {
+  html::-webkit-scrollbar,body::-webkit-scrollbar {width:8px;height:8px}
+}
+
 /* Dropdowns and search share the same muted jade scrollbar. */
 .submenu,.select-popover,.search-results,.search-dialog {
   scrollbar-width:thin;
