@@ -103,9 +103,9 @@
   <script src="function-tool.js?v=69149ca83d87" defer></script>
   <link rel="stylesheet" href="function-tool.css?v=74f7def66b05">
   <script src="environment-logic.js?v=be292af9b43a" defer></script>
-  <script src="environment-view.js?v=9a76ff4cafd4" defer></script>
-  <script src="environment-tool.js?v=c182ddecbea7" defer></script>
-  <link rel="stylesheet" href="environment.css?v=e9488dd7f41b">
+  <script src="environment-view.js?v=913e4d0aa2b0" defer></script>
+  <script src="environment-tool.js?v=36625c5e55b3" defer></script>
+  <link rel="stylesheet" href="environment.css?v=99d242229a1f">
   <link rel="stylesheet" href="mobile.css?v=16f60ead6c82">
   <script src="mobile-layout.js?v=eb88ba75f604" defer></script>
 </head>
@@ -333,7 +333,7 @@
 </section>
 <section class="tool-panel environment-tool" id="tool-environment" hidden aria-label="环境检测">
   <div class="env-heading"><div><p class="mini-kicker">ENVIRONMENT LAB / KNOW YOUR CONNECTION</p><h2>看见浏览器里的运行环境。</h2><p>从网络出口到设备能力，逐项展示实际数据、检测来源与浏览器限制。</p></div><span class="env-badge" id="env-updated">等待检测</span></div>
-  <div class="env-overview"><div><span>公网出口 IP</span><strong id="env-overview-ip">待网络检测</strong><small>按不同服务分别测量</small></div><div><span>时区</span><strong id="env-overview-zone">—</strong><small id="env-overview-offset">—</small></div><div><span>首选语言</span><strong id="env-overview-language">—</strong><small>浏览器提供的语言</small></div><div><span>平台</span><strong id="env-overview-platform">—</strong><small>以浏览器公开信息为准</small></div></div>
+  <div class="env-overview"><div><span>公网出口 IP</span><strong id="env-overview-ip">待网络检测</strong><small id="env-overview-country">所属国家/地区：待网络检测</small></div><div><span>时区</span><strong id="env-overview-zone">—</strong><small id="env-overview-offset">—</small></div><div><span>首选语言</span><strong id="env-overview-language">—</strong><small>浏览器提供的语言</small></div><div><span>平台</span><strong id="env-overview-platform">—</strong><small>以浏览器公开信息为准</small></div></div>
   <div class="env-actions"><button class="button primary" type="button" id="env-local">刷新本机信息</button><button class="button secondary" type="button" id="env-network">开始网络检测</button><button class="button secondary" type="button" id="env-stop" hidden>停止检测</button><button class="button secondary" type="button" id="env-copy">复制报告</button><button class="button secondary" type="button" id="env-export">下载报告</button></div>
   <p id="env-status" class="env-status" role="status" aria-live="polite">进入页面自动读取本机信息；网络、指纹和定位检测由你手动启动。</p>
   <div class="env-notice">网络检测会连接 ipify、ipapi.co、Cloudflare、httpbin，以及下方列出的测试站点。浏览器指纹仅在本机计算，不上传；报告可能包含 IP 和设备信息。所有结果仅保留在本次页面内存中。</div>
